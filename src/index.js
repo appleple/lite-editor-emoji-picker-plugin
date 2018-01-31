@@ -14,7 +14,11 @@ export default ({
       if (!picker) {
         const container = document.querySelector(`[data-id="${editor.id}"]`);
         const editable = container.querySelector('[data-selector="lite-editor"]');
-        const picker = new EmojiPicker();
+        const picker = new EmojiPicker({
+          callback: () => {
+            editor.onInput();
+          }
+        });
         picker.listenOn(editor.e.target, container, editable);
         picker.openPicker(editor.e);
       }

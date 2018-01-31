@@ -10435,7 +10435,11 @@ exports.default = function (_ref) {
       if (!picker) {
         var container = document.querySelector('[data-id="' + editor.id + '"]');
         var editable = container.querySelector('[data-selector="lite-editor"]');
-        var _picker = new _rmEmojiPicker2.default();
+        var _picker = new _rmEmojiPicker2.default({
+          callback: function callback() {
+            editor.onInput();
+          }
+        });
         _picker.listenOn(editor.e.target, container, editable);
         _picker.openPicker(editor.e);
       }

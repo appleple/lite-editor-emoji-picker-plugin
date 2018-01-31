@@ -23916,16 +23916,11 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 exports.default = function (_ref) {
   var _ref$label = _ref.label,
       label = _ref$label === undefined ? 'emoji' : _ref$label,
-      _ref$tag = _ref.tag,
-      tag = _ref$tag === undefined ? 'span' : _ref$tag,
-      className = _ref.className,
       group = _ref.group;
 
   var picker = null;
   return {
     label: label,
-    tag: tag,
-    className: className,
     group: group,
     action: 'extra',
     onClick: function onClick(editor) {

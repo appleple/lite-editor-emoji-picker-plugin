@@ -1,13 +1,11 @@
 import EmojiPicker from "rm-emoji-picker";
 
 export default ({
-    label = 'emoji', tag = 'span', className, group
+    label = 'emoji', group
 }) => {
   let picker = null; 
   return {
     label,
-    tag,
-    className,
     group,
     action: 'extra',
     onClick: (editor) => {

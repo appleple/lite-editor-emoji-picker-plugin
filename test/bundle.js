@@ -23921,16 +23921,21 @@ exports.default = function (_ref) {
       className = _ref.className,
       group = _ref.group;
 
-  // const picker = new EmojiPicker();
+  var picker = null;
   return {
     label: label,
     tag: tag,
     className: className,
     group: group,
     action: 'extra',
-    onClick: function onClick(a, b) {
-      console.log(a, b);
-      console.log('test');
+    onClick: function onClick(editor) {
+      if (!picker) {
+        var container = document.querySelector('[data-id="' + editor.id + '"]');
+        var editable = container.querySelector('[data-selector="lite-editor"]');
+        var _picker = new _rmEmojiPicker2.default();
+        _picker.listenOn(editor.e.target, container, editable);
+        _picker.openPicker(editor.e);
+      }
     }
   };
 };

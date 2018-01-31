@@ -1,0 +1,1 @@
+# Lite Editor Emoji Plugin

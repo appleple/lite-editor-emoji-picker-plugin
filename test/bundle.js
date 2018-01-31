@@ -23921,14 +23921,15 @@ exports.default = function (_ref) {
       className = _ref.className,
       group = _ref.group;
 
-  var picker = new _rmEmojiPicker2.default();
+  // const picker = new EmojiPicker();
   return {
     label: label,
     tag: tag,
     className: className,
     group: group,
     action: 'extra',
-    onClick: function onClick() {
+    onClick: function onClick(a, b) {
+      console.log(a, b);
       console.log('test');
     }
   };
@@ -23950,6 +23951,8 @@ var _src2 = _interopRequireDefault(_src);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var editor = new _liteEditor2.default('.js-editor');
-editor.registerButton((0, _src2.default)());
+editor.registerButton((0, _src2.default)({
+    label: 'emoji'
+}));
 
 },{"../src":100,"lite-editor":74}]},{},[101]);

@@ -1,5 +1,5 @@
 {
-  "name": "lite-editor-emoji-plugin",
+  "name": "lite-editor-emoji-picker-plugin",
   "version": "1.0.0",
   "description": "lite-editor plugin for emojis",
   "main": "index.js",

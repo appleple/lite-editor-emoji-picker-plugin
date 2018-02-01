@@ -2,7 +2,7 @@
   "name": "lite-editor-emoji-picker-plugin",
   "version": "1.0.1",
   "description": "lite-editor plugin for emojis",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "npm run lint",
     "lint": "eslint ./src/index.js --fix",

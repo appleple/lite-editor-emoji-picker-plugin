@@ -2,11 +2,24 @@
 
 <img src="./screenshot.jpg">
 
+## Installation
+
+via npm
+```shell
+npm install lite-editor-emoji-picker-plugin --save
+```
+
+or yarn
+
+```shell
+yarn add lite-editor-emoji-picker-plugin
+```
+
 ## Usage
 
 ```js
 import LiteEditor from 'lite-editor';
-import liteEditorEmojiPicker from '../src';
+import liteEditorEmojiPicker from 'lite-editor-emoji-picker-plugin';
 
 const editor = new LiteEditor('.js-editor');
 editor.registerButton(liteEditorEmojiPicker({

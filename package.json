@@ -19,7 +19,6 @@
     "sync": "browser-sync start --server './' --files './js/*.js' './css/*.css' --startPath '/test/index.html'",
     "watch:sass": "onchange \"scss\" -- npm run build:sass",
     "start": "npm-run-all -p watch:js sync",
-    "prepublish": "npm run build:js && git add -A && git commit -m \"bumping version\"",
     "deploy": "np --no-cleanup"
   },
   "keywords": [

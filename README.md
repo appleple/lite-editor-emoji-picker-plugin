@@ -1,4 +1,4 @@
-# Lite Editor Emoji Plugin
+# Lite Editor Emoji Picker Plugin
 
 <img src="./screenshot.png">
 

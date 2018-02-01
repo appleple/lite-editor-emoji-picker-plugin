@@ -23967,6 +23967,7 @@ exports.default = function (_ref) {
         var target = e.target;
         var container = document.querySelector('[data-id="' + editor.id + '"]');
         var editable = container.querySelector('[data-selector="lite-editor"]');
+        container.style.position = 'relative';
         picker = new _rmEmojiPicker2.default({
           callback: function callback() {
             editor.onInput();

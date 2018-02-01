@@ -1,7 +1,7 @@
 import LiteEditor from 'lite-editor';
-import liteEditorEmoji from '../src';
+import liteEditorEmojiPicker from '../src';
 
 const editor = new LiteEditor('.js-editor');
-editor.registerButton(liteEditorEmoji({
+editor.registerButton(liteEditorEmojiPicker({
     label: 'emoji'
 }));

@@ -23901,38 +23901,38 @@ function config (name) {
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],100:[function(require,module,exports){
-"use strict";
+'use strict';
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _rmEmojiPicker = require("rm-emoji-picker");
+var _rmEmojiPicker = require('rm-emoji-picker');
 
 var _rmEmojiPicker2 = _interopRequireDefault(_rmEmojiPicker);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var defaultCategories = [{
-  title: "People",
+  title: 'People',
   icon: '<i class="fa fa-smile-o" aria-hidden="true"></i>'
 }, {
-  title: "Nature",
+  title: 'Nature',
   icon: '<i class="fa fa-leaf" aria-hidden="true"></i>'
 }, {
-  title: "Foods",
+  title: 'Foods',
   icon: '<i class="fa fa-cutlery" aria-hidden="true"></i>'
 }, {
-  title: "Activity",
+  title: 'Activity',
   icon: '<i class="fa fa-futbol-o" aria-hidden="true"></i>'
 }, {
-  title: "Places",
+  title: 'Places',
   icon: '<i class="fa fa-globe" aria-hidden="true"></i>'
 }, {
-  title: "Symbols",
+  title: 'Symbols',
   icon: '<i class="fa fa-lightbulb-o" aria-hidden="true"></i>'
 }, {
-  title: "Flags",
+  title: 'Flags',
   icon: '<i class="fa fa-flag-checkered" aria-hidden="true"></i>'
 }];
 
@@ -23943,7 +23943,7 @@ var fireClick = function fireClick(node) {
     node.dispatchEvent(evt);
   } else if (document.createEventObject) {
     node.fireEvent('onclick');
-  } else if (typeof node.onclick == 'function') {
+  } else if (typeof node.onclick === 'function') {
     node.onclick();
   }
 };
@@ -23962,25 +23962,25 @@ exports.default = function (_ref) {
     action: 'extra',
 
     onClick: function onClick(editor) {
-      var e = editor.e;
-      var target = e.target;
       if (!picker) {
-        var container = document.querySelector("[data-id=\"" + editor.id + "\"]");
+        var e = editor.e;
+        var target = e.target;
+        var container = document.querySelector('[data-id="' + editor.id + '"]');
         var editable = container.querySelector('[data-selector="lite-editor"]');
-        var _picker = new _rmEmojiPicker2.default({
+        picker = new _rmEmojiPicker2.default({
           callback: function callback() {
             editor.onInput();
           },
           categories: categories
         });
-        _picker.listenOn(target, container, editable);
+        picker.listenOn(target, container, editable);
         fireClick(target);
       }
     }
   };
 };
 
-module.exports = exports["default"];
+module.exports = exports['default'];
 
 },{"rm-emoji-picker":94}],101:[function(require,module,exports){
 'use strict';

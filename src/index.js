@@ -1,32 +1,32 @@
-import EmojiPicker from "rm-emoji-picker";
+import EmojiPicker from 'rm-emoji-picker';
 
 const defaultCategories = [
   {
-    title: "People",
+    title: 'People',
     icon: '<i class="fa fa-smile-o" aria-hidden="true"></i>'
   },
   {
-    title: "Nature",
+    title: 'Nature',
     icon: '<i class="fa fa-leaf" aria-hidden="true"></i>'
   },
   {
-    title: "Foods",
+    title: 'Foods',
     icon: '<i class="fa fa-cutlery" aria-hidden="true"></i>'
   },
   {
-    title: "Activity",
+    title: 'Activity',
     icon: '<i class="fa fa-futbol-o" aria-hidden="true"></i>'
   },
   {
-    title: "Places",
+    title: 'Places',
     icon: '<i class="fa fa-globe" aria-hidden="true"></i>'
   },
   {
-    title: "Symbols",
+    title: 'Symbols',
     icon: '<i class="fa fa-lightbulb-o" aria-hidden="true"></i>'
   },
   {
-    title: "Flags",
+    title: 'Flags',
     icon: '<i class="fa fa-flag-checkered" aria-hidden="true"></i>'
   }
 ];
@@ -38,10 +38,10 @@ const fireClick = (node) => {
     node.dispatchEvent(evt);
   } else if (document.createEventObject) {
     node.fireEvent('onclick');
-  } else if (typeof node.onclick == 'function') {
+  } else if (typeof node.onclick === 'function') {
     node.onclick();
   }
-}
+};
 
 export default ({
     label = 'emoji', group, categories = defaultCategories
@@ -53,12 +53,12 @@ export default ({
     action: 'extra',
 
     onClick: (editor) => {
-      const e = editor.e;
-      const target = e.target;
       if (!picker) {
+        const e = editor.e;
+        const target = e.target;
         const container = document.querySelector(`[data-id="${editor.id}"]`);
         const editable = container.querySelector('[data-selector="lite-editor"]');
-        const picker = new EmojiPicker({
+        picker = new EmojiPicker({
           callback: () => {
             editor.onInput();
           },
@@ -68,5 +68,5 @@ export default ({
         fireClick(target);
       }
     }
-  }
+  };
 };

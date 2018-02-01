@@ -5,7 +5,7 @@
  * lite-editor-emoji-picker-plugin:
  *   license: MIT (http://opensource.org/licenses/MIT)
  *   author: steelydylan
- *   version: 0.0.1
+ *   version: 1.0.0
  *
  * jquery:
  *   license: MIT (http://opensource.org/licenses/MIT)

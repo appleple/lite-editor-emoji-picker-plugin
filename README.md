@@ -4,7 +4,7 @@
 
 ## Examples
 
-[https://cdn.rawgit.com/appleple/lite-editor-emoji-plugin/b5d81cc5/test/index.html](https://cdn.rawgit.com/appleple/lite-editor-emoji-plugin/b5d81cc5/test/index.html)
+[https://cdn.rawgit.com/appleple/lite-editor-emoji-picker-plugin/7db8630c/test/index.html](https://cdn.rawgit.com/appleple/lite-editor-emoji-picker-plugin/7db8630c/test/index.html)
 
 ## Installation
 

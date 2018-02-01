@@ -13,7 +13,7 @@
     "build:global:min": "uglifyjs ./js/lite-editor-emoji-plugin.js -m -c --comments -o ./js/lite-editor-emoji-plugin.min.js",
     "build:sass": "npm-run-all -p sass sass:min",
     "babel": "babel src --out-dir lib",
-    "sass": "node-sass ./scss/lite-editor-emoji-picker.scss ./css/lite-editor-emoji-picker.css --output-style expanded",
+    "sass": "node-sass ./scss/lite-editor-emoji-picker.scss ./css/lite-editor-emoji-picker.css --output-style expanded --include-path ./node_modules",
     "sass:min": "node-sass ./scss/lite-editor-emoji-picker.scss ./css/lite-editor-emoji-picker.min.css --output-style compressed",
     "watch:js": "onchange \"src/\" -- npm run build:js",
     "sync": "browser-sync start --server './' --files './js/*.js' './css/*.css' --startPath '/test/index.html'",

@@ -1,6 +1,6 @@
 # Lite Editor Emoji Plugin
 
-<img src="./screenshot.jpg">
+<img src="./screenshot.png">
 
 ## Examples
 

@@ -23998,7 +23998,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var editor = new _liteEditor2.default('.js-editor');
 editor.registerButton((0, _src2.default)({
-    label: 'emoji'
+  label: '<i class="lite-editor-emoji-font lite-editor-emoji-font-people" aria-hidden="true"></i>'
 }));
 
 },{"../src":100,"lite-editor":74}]},{},[101]);

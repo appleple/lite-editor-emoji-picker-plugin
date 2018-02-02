@@ -1,6 +1,10 @@
 @import "variables";
 @import "rm-emoji-picker/src/scss/emojipicker.scss";
 
+#emoji-picker {
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+}
+
 @font-face {
   font-family: 'lite-editor-emoji-fonts-20180201';
   src:  url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180201.eot?cpcbey');

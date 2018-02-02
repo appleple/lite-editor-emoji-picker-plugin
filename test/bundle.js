@@ -23953,7 +23953,9 @@ exports.default = function (_ref) {
       label = _ref$label === undefined ? 'emoji' : _ref$label,
       group = _ref.group,
       _ref$categories = _ref.categories,
-      categories = _ref$categories === undefined ? defaultCategories : _ref$categories;
+      categories = _ref$categories === undefined ? defaultCategories : _ref$categories,
+      _ref$default_footer_m = _ref.default_footer_message,
+      default_footer_message = _ref$default_footer_m === undefined ? "Please select an emoji from the list above" : _ref$default_footer_m;
 
   var picker = null;
   return {
@@ -23972,6 +23974,7 @@ exports.default = function (_ref) {
           callback: function callback() {
             editor.onInput();
           },
+          default_footer_message: default_footer_message,
           categories: categories
         });
         picker.listenOn(target, container, editable);
@@ -23998,7 +24001,8 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var editor = new _liteEditor2.default('.js-editor');
 editor.registerButton((0, _src2.default)({
-  label: '<i class="lite-editor-emoji-font lite-editor-emoji-font-people" aria-hidden="true"></i>'
+  label: '<i class="lite-editor-emoji-font lite-editor-emoji-font-people" aria-hidden="true"></i>',
+  default_footer_message: '上から絵文字を選択してください'
 }));
 
 },{"../src":100,"lite-editor":74}]},{},[101]);

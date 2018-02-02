@@ -44,7 +44,8 @@ const fireClick = (node) => {
 };
 
 export default ({
-    label = 'emoji', group, categories = defaultCategories
+    label = 'emoji', group, categories = defaultCategories,
+    default_footer_message =  "Please select an emoji from the list above"
 }) => {
   let picker = null;
   return {
@@ -63,6 +64,7 @@ export default ({
           callback: () => {
             editor.onInput();
           },
+          default_footer_message,
           categories
         });
         picker.listenOn(target, container, editable);

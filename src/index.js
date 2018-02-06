@@ -50,5 +50,12 @@ export default ({
       categories
     });
     picker.listenOn(target, container, editable);
+  },
+  onRender: (editor, target) => {
+    if (editor.data.showSource) {
+      target.setAttribute("disabled", true);
+    } else {
+      target.removeAttribute("disabled");
+    }
   }
 });

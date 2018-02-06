@@ -18973,6 +18973,16 @@ var LiteEditor = function (_aTemplate) {
       }
     }
   }, {
+    key: 'onRender',
+    value: function onRender(i) {
+      var number = parseInt(i, 10);
+      var btn = this.data.btnOptions[number];
+      var btnElement = this._getElementByQuery('[data-selector="btn-group"] [data-index="' + i + '"]');
+      if (btn.onRender) {
+        btn.onRender(this, btnElement);
+      }
+    }
+  }, {
     key: 'beforeUpdated',
     value: function beforeUpdated() {
       var data = this.data;
@@ -18998,6 +19008,7 @@ var LiteEditor = function (_aTemplate) {
       var source = this._getElementByQuery('[data-selector="lite-editor-source"]');
       this.data.btnOptions.forEach(function (btn, index) {
         _this6.onInit(index);
+        _this6.onRender(index);
       });
       if (this.data.showSource === true) {
         source.style.height = source.scrollHeight + 'px';
@@ -23996,6 +24007,13 @@ exports.default = function (_ref) {
         categories: categories
       });
       picker.listenOn(target, container, editable);
+    },
+    onRender: function onRender(editor, target) {
+      if (editor.data.showSource) {
+        target.setAttribute("disabled", true);
+      } else {
+        target.removeAttribute("disabled");
+      }
     }
   };
 };

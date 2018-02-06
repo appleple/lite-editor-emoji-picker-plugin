@@ -28,7 +28,7 @@
   "license": "MIT",
   "dependencies": {
     "jquery": "^3.3.1",
-    "lite-editor": "^1.4.3",
+    "lite-editor": "^1.6.1",
     "rm-emoji-picker": "^0.3.31"
   },
   "devDependencies": {

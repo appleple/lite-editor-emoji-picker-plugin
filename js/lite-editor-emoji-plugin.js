@@ -5,7 +5,7 @@
  * lite-editor-emoji-picker-plugin:
  *   license: MIT (http://opensource.org/licenses/MIT)
  *   author: steelydylan
- *   version: 2.0.0
+ *   version: 2.0.1
  *
  * jquery:
  *   license: MIT (http://opensource.org/licenses/MIT)
@@ -10463,6 +10463,13 @@ exports.default = function (_ref) {
         categories: categories
       });
       picker.listenOn(target, container, editable);
+    },
+    onRender: function onRender(editor, target) {
+      if (editor.data.showSource) {
+        target.setAttribute("disabled", true);
+      } else {
+        target.removeAttribute("disabled");
+      }
     }
   };
 };

@@ -5,7 +5,7 @@
  * lite-editor-emoji-picker-plugin:
  *   license: MIT (http://opensource.org/licenses/MIT)
  *   author: steelydylan
- *   version: 1.1.1
+ *   version: 2.0.0
  *
  * jquery:
  *   license: MIT (http://opensource.org/licenses/MIT)
@@ -10453,12 +10453,11 @@ exports.default = function (_ref) {
     label: label,
     group: group,
     action: 'extra',
-
     onInit: function onInit(editor, target) {
       var container = document.querySelector('[data-id="' + editor.id + '"]');
       var editable = container.querySelector('[data-selector="lite-editor"]');
       container.style.position = 'relative';
-      picker = new _rmEmojiPicker2.default({
+      var picker = new _rmEmojiPicker2.default({
         callback: function callback() {
           editor.onInput();
         },

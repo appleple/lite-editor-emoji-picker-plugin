@@ -40,12 +40,11 @@ export default ({
     label,
     group,
     action: 'extra',
-
     onInit: (editor, target) => {
       const container = document.querySelector(`[data-id="${editor.id}"]`);
       const editable = container.querySelector('[data-selector="lite-editor"]');
       container.style.position = 'relative';
-      picker = new EmojiPicker({
+      const picker = new EmojiPicker({
         callback: () => {
           editor.onInput();
         },

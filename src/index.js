@@ -34,23 +34,21 @@ const defaultCategories = [
 export default ({
     label = 'emoji', group, categories = defaultCategories,
     default_footer_message = 'Please select an emoji from the list above'
-}) => {
-  return {
-    label,
-    group,
-    action: 'extra',
-    onInit: (editor, target) => {
-      const container = document.querySelector(`[data-id="${editor.id}"]`);
-      const editable = container.querySelector('[data-selector="lite-editor"]');
-      container.style.position = 'relative';
-      const picker = new EmojiPicker({
-        callback: () => {
-          editor.onInput();
-        },
-        default_footer_message,
-        categories
-      });
-      picker.listenOn(target, container, editable);
-    }
-  };
-};
+}) => ({
+  label,
+  group,
+  action: 'extra',
+  onInit: (editor, target) => {
+    const container = document.querySelector(`[data-id="${editor.id}"]`);
+    const editable = container.querySelector('[data-selector="lite-editor"]');
+    container.style.position = 'relative';
+    const picker = new EmojiPicker({
+      callback: () => {
+        editor.onInput();
+      },
+      default_footer_message,
+      categories
+    });
+    picker.listenOn(target, container, editable);
+  }
+});

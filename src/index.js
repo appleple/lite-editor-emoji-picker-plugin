@@ -31,21 +31,9 @@ const defaultCategories = [
   }
 ];
 
-const fireClick = (node) => {
-  if (document.createEvent) {
-    const evt = document.createEvent('MouseEvents');
-    evt.initEvent('click', true, false);
-    node.dispatchEvent(evt);
-  } else if (document.createEventObject) {
-    node.fireEvent('onclick');
-  } else if (typeof node.onclick === 'function') {
-    node.onclick();
-  }
-};
-
 export default ({
     label = 'emoji', group, categories = defaultCategories,
-    default_footer_message =  "Please select an emoji from the list above"
+    default_footer_message = 'Please select an emoji from the list above'
 }) => {
   let picker = null;
   return {
@@ -58,7 +46,7 @@ export default ({
       const editable = container.querySelector('[data-selector="lite-editor"]');
       container.style.position = 'relative';
       picker = new EmojiPicker({
-        callback: (a) => {
+        callback: () => {
           editor.onInput();
         },
         default_footer_message,

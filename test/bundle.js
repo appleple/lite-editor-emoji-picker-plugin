@@ -23972,18 +23972,6 @@ var defaultCategories = [{
   icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-flag" aria-hidden="true"></i>'
 }];
 
-var fireClick = function fireClick(node) {
-  if (document.createEvent) {
-    var evt = document.createEvent('MouseEvents');
-    evt.initEvent('click', true, false);
-    node.dispatchEvent(evt);
-  } else if (document.createEventObject) {
-    node.fireEvent('onclick');
-  } else if (typeof node.onclick === 'function') {
-    node.onclick();
-  }
-};
-
 exports.default = function (_ref) {
   var _ref$label = _ref.label,
       label = _ref$label === undefined ? 'emoji' : _ref$label,
@@ -23991,7 +23979,7 @@ exports.default = function (_ref) {
       _ref$categories = _ref.categories,
       categories = _ref$categories === undefined ? defaultCategories : _ref$categories,
       _ref$default_footer_m = _ref.default_footer_message,
-      default_footer_message = _ref$default_footer_m === undefined ? "Please select an emoji from the list above" : _ref$default_footer_m;
+      default_footer_message = _ref$default_footer_m === undefined ? 'Please select an emoji from the list above' : _ref$default_footer_m;
 
   var picker = null;
   return {
@@ -24004,7 +23992,7 @@ exports.default = function (_ref) {
       var editable = container.querySelector('[data-selector="lite-editor"]');
       container.style.position = 'relative';
       picker = new _rmEmojiPicker2.default({
-        callback: function callback(a) {
+        callback: function callback() {
           editor.onInput();
         },
         default_footer_message: default_footer_message,

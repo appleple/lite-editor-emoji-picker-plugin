@@ -23981,7 +23981,6 @@ exports.default = function (_ref) {
       _ref$default_footer_m = _ref.default_footer_message,
       default_footer_message = _ref$default_footer_m === undefined ? 'Please select an emoji from the list above' : _ref$default_footer_m;
 
-  var picker = null;
   return {
     label: label,
     group: group,

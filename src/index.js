@@ -35,7 +35,6 @@ export default ({
     label = 'emoji', group, categories = defaultCategories,
     default_footer_message = 'Please select an emoji from the list above'
 }) => {
-  let picker = null;
   return {
     label,
     group,

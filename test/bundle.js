@@ -24010,9 +24010,9 @@ exports.default = function (_ref) {
     },
     onRender: function onRender(editor, target) {
       if (editor.data.showSource) {
-        target.setAttribute("disabled", true);
+        target.setAttribute('disabled', true);
       } else {
-        target.removeAttribute("disabled");
+        target.removeAttribute('disabled');
       }
     }
   };

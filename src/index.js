@@ -53,9 +53,9 @@ export default ({
   },
   onRender: (editor, target) => {
     if (editor.data.showSource) {
-      target.setAttribute("disabled", true);
+      target.setAttribute('disabled', true);
     } else {
-      target.removeAttribute("disabled");
+      target.removeAttribute('disabled');
     }
   }
 });

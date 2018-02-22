@@ -24003,11 +24003,15 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
 var _rmEmojiPicker = require('rm-emoji-picker');
 
 var _rmEmojiPicker2 = _interopRequireDefault(_rmEmojiPicker);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var defaultCategories = [{
   title: 'People',
@@ -24032,21 +24036,33 @@ var defaultCategories = [{
   icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-flag" aria-hidden="true"></i>'
 }];
 
-exports.default = function (_ref) {
-  var _ref$label = _ref.label,
-      label = _ref$label === undefined ? '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>' : _ref$label,
-      group = _ref.group,
-      _ref$categories = _ref.categories,
-      categories = _ref$categories === undefined ? defaultCategories : _ref$categories,
-      _ref$default_footer_m = _ref.default_footer_message,
-      default_footer_message = _ref$default_footer_m === undefined ? 'Please select an emoji from the list above' : _ref$default_footer_m;
-  return {
-    label: label,
-    group: group,
-    action: 'extra',
-    onInit: function onInit(editor, target) {
+var LiteEditorEmojiPicker = function () {
+  function LiteEditorEmojiPicker(_ref) {
+    var _ref$label = _ref.label,
+        label = _ref$label === undefined ? '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>' : _ref$label,
+        group = _ref.group,
+        _ref$categories = _ref.categories,
+        categories = _ref$categories === undefined ? defaultCategories : _ref$categories,
+        _ref$default_footer_m = _ref.default_footer_message,
+        default_footer_message = _ref$default_footer_m === undefined ? 'Please select an emoji from the list above' : _ref$default_footer_m;
+
+    _classCallCheck(this, LiteEditorEmojiPicker);
+
+    this.label = label;
+    this.group = group;
+    this.categories = categories;
+    this.default_footer_message = default_footer_message;
+    this.action = 'extra';
+  }
+
+  _createClass(LiteEditorEmojiPicker, [{
+    key: 'onInit',
+    value: function onInit(editor, target) {
       var container = document.querySelector('[data-id="' + editor.id + '"]');
       var editable = container.querySelector('[data-selector="lite-editor"]');
+      var default_footer_message = this.default_footer_message,
+          categories = this.categories;
+
       container.style.position = 'relative';
       var picker = new _rmEmojiPicker2.default({
         callback: function callback() {
@@ -24056,17 +24072,22 @@ exports.default = function (_ref) {
         categories: categories
       });
       picker.listenOn(target, container, editable);
-    },
-    onRender: function onRender(editor, target) {
+    }
+  }, {
+    key: 'onRender',
+    value: function onRender(editor, target) {
       if (editor.data.showSource) {
         target.setAttribute('disabled', true);
       } else {
         target.removeAttribute('disabled');
       }
     }
-  };
-};
+  }]);
 
+  return LiteEditorEmojiPicker;
+}();
+
+exports.default = LiteEditorEmojiPicker;
 module.exports = exports['default'];
 
 },{"rm-emoji-picker":94}],101:[function(require,module,exports){
@@ -24083,7 +24104,7 @@ var _src2 = _interopRequireDefault(_src);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var editor = new _liteEditor2.default('.js-editor');
-editor.registerButton((0, _src2.default)({
+editor.registerButton(new _src2.default({
   default_footer_message: '上から絵文字を選択してください'
 }));
 

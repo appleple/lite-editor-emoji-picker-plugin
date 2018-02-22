@@ -1,4 +1,5 @@
 import EmojiPicker from 'rm-emoji-picker';
+import { setTimeout } from 'timers';
 
 const defaultCategories = [
   {
@@ -41,13 +42,23 @@ export default class LiteEditorEmojiPicker {
     this.categories = categories;
     this.default_footer_message = default_footer_message;
     this.action = 'extra';
+    this.firstClicked = false;
   }
 
-  onInit (editor, target) {
+  onInit(editor, target) {
+    this.editor = editor;
+    this.target = target;
+  }
+
+  onClick ()  {
+    const { editor, target, default_footer_message, categories } = this;
     const container = document.querySelector(`[data-id="${editor.id}"]`);
     const editable = container.querySelector('[data-selector="lite-editor"]');
-    const { default_footer_message, categories } = this;
     container.style.position = 'relative';
+    if (this.firstClicked) {
+      return;
+    }
+    this.firstClicked = true;
     const picker = new EmojiPicker({
       callback: () => {
         editor.onInput();
@@ -56,6 +67,16 @@ export default class LiteEditorEmojiPicker {
       categories
     });
     picker.listenOn(target, container, editable);
+    editor.focus();
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        target.click();
+      })
+    } else {
+      setTimeout(() => {
+        target.click();
+      }, 100);
+    }
   }
 
   onRender (editor, target) {

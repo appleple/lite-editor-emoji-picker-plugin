@@ -6,19 +6,19 @@
 }
 
 @font-face {
-  font-family: 'lite-editor-emoji-fonts-20180201';
-  src:  url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180201.eot?cpcbey');
-  src:  url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180201.eot?cpcbey#iefix') format('embedded-opentype'),
-    url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180201.ttf?cpcbey') format('truetype'),
-    url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180201.woff?cpcbey') format('woff'),
-    url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180201.svg?cpcbey#lite-editor-emoji-fonts-20180201') format('svg');
+  font-family: 'lite-editor-emoji-fonts-20180222';
+  src:  url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180222.eot?cpcbey');
+  src:  url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180222.eot?cpcbey#iefix') format('embedded-opentype'),
+    url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180222.ttf?cpcbey') format('truetype'),
+    url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180222.woff?cpcbey') format('woff'),
+    url('#{$icomoon-font-path}/lite-editor-emoji-fonts-20180222.svg?cpcbey#lite-editor-emoji-fonts-20180222') format('svg');
   font-weight: normal;
   font-style: normal;
 }
 
 [class^="lite-editor-emoji-font-"], [class*=" lite-editor-emoji-font-"] {
   /* use !important to prevent issues with browser extensions that change fonts */
-  font-family: 'lite-editor-emoji-fonts-20180201' !important;
+  font-family: 'lite-editor-emoji-fonts-20180222' !important;
   speak: none;
   font-style: normal;
   font-weight: normal;
@@ -66,4 +66,8 @@
     content: $icon-lite-editor-emoji-font-flag;
   }
 }
-
+.lite-editor-emoji-font-smile {
+  &:before {
+    content: $icon-lite-editor-emoji-font-smile;
+  }
+}

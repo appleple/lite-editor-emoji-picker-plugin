@@ -32,7 +32,7 @@ const defaultCategories = [
 ];
 
 export default ({
-    label = 'emoji', group, categories = defaultCategories,
+    label = '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>', group, categories = defaultCategories,
     default_footer_message = 'Please select an emoji from the list above'
 }) => ({
   label,

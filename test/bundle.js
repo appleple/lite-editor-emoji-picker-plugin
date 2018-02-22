@@ -19363,7 +19363,7 @@ var LiteEditor = function (_aTemplate) {
 
 exports.default = LiteEditor;
 module.exports = exports['default'];
-},{"../lib/util":75,"a-template":1,"deep-extend":12,"html-entities":52,"upndown":99}],74:[function(require,module,exports){
+},{"../lib/util":75,"a-template":1,"deep-extend":12,"html-entities":52,"upndown":98}],74:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./core/');
@@ -22757,7 +22757,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":82,"./internal/streams/destroy":88,"./internal/streams/stream":89,"_process":80,"core-util-is":11,"inherits":65,"process-nextick-args":79,"safe-buffer":95,"util-deprecate":100}],87:[function(require,module,exports){
+},{"./_stream_duplex":82,"./internal/streams/destroy":88,"./internal/streams/stream":89,"_process":80,"core-util-is":11,"inherits":65,"process-nextick-args":79,"safe-buffer":95,"util-deprecate":99}],87:[function(require,module,exports){
 'use strict';
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -23414,83 +23414,6 @@ function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
 },{"safe-buffer":95}],98:[function(require,module,exports){
-var nextTick = require('process/browser.js').nextTick;
-var apply = Function.prototype.apply;
-var slice = Array.prototype.slice;
-var immediateIds = {};
-var nextImmediateId = 0;
-
-// DOM APIs, for completeness
-
-exports.setTimeout = function() {
-  return new Timeout(apply.call(setTimeout, window, arguments), clearTimeout);
-};
-exports.setInterval = function() {
-  return new Timeout(apply.call(setInterval, window, arguments), clearInterval);
-};
-exports.clearTimeout =
-exports.clearInterval = function(timeout) { timeout.close(); };
-
-function Timeout(id, clearFn) {
-  this._id = id;
-  this._clearFn = clearFn;
-}
-Timeout.prototype.unref = Timeout.prototype.ref = function() {};
-Timeout.prototype.close = function() {
-  this._clearFn.call(window, this._id);
-};
-
-// Does not start the time, just sets up the members needed.
-exports.enroll = function(item, msecs) {
-  clearTimeout(item._idleTimeoutId);
-  item._idleTimeout = msecs;
-};
-
-exports.unenroll = function(item) {
-  clearTimeout(item._idleTimeoutId);
-  item._idleTimeout = -1;
-};
-
-exports._unrefActive = exports.active = function(item) {
-  clearTimeout(item._idleTimeoutId);
-
-  var msecs = item._idleTimeout;
-  if (msecs >= 0) {
-    item._idleTimeoutId = setTimeout(function onTimeout() {
-      if (item._onTimeout)
-        item._onTimeout();
-    }, msecs);
-  }
-};
-
-// That's not how node.js implements it but the exposed api is the same.
-exports.setImmediate = typeof setImmediate === "function" ? setImmediate : function(fn) {
-  var id = nextImmediateId++;
-  var args = arguments.length < 2 ? false : slice.call(arguments, 1);
-
-  immediateIds[id] = true;
-
-  nextTick(function onNextTick() {
-    if (immediateIds[id]) {
-      // fn.call() is faster so we optimize for the common use-case
-      // @see http://jsperf.com/call-apply-segu
-      if (args) {
-        fn.apply(null, args);
-      } else {
-        fn.call(null);
-      }
-      // Prevent ids from leaking
-      exports.clearImmediate(id);
-    }
-  });
-
-  return id;
-};
-
-exports.clearImmediate = typeof clearImmediate === "function" ? clearImmediate : function(id) {
-  delete immediateIds[id];
-};
-},{"process/browser.js":80}],99:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -24002,7 +23925,7 @@ module.exports = function () {
 }();
 
 
-},{"htmlparser2":63}],100:[function(require,module,exports){
+},{"htmlparser2":63}],99:[function(require,module,exports){
 (function (global){
 
 /**
@@ -24073,7 +23996,7 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],101:[function(require,module,exports){
+},{}],100:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -24085,8 +24008,6 @@ var _createClass = function () { function defineProperties(target, props) { for 
 var _rmEmojiPicker = require('rm-emoji-picker');
 
 var _rmEmojiPicker2 = _interopRequireDefault(_rmEmojiPicker);
-
-var _timers = require('timers');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -24170,7 +24091,7 @@ var LiteEditorEmojiPicker = function () {
           target.click();
         });
       } else {
-        (0, _timers.setTimeout)(function () {
+        setTimeout(function () {
           target.click();
         }, 100);
       }
@@ -24192,7 +24113,7 @@ var LiteEditorEmojiPicker = function () {
 exports.default = LiteEditorEmojiPicker;
 module.exports = exports['default'];
 
-},{"rm-emoji-picker":94,"timers":98}],102:[function(require,module,exports){
+},{"rm-emoji-picker":94}],101:[function(require,module,exports){
 'use strict';
 
 var _liteEditor = require('lite-editor');
@@ -24210,4 +24131,4 @@ editor.registerButton(new _src2.default({
   default_footer_message: '上から絵文字を選択してください'
 }));
 
-},{"../src":101,"lite-editor":74}]},{},[102]);
+},{"../src":100,"lite-editor":74}]},{},[101]);

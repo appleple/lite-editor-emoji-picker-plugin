@@ -1,5 +1,4 @@
 import EmojiPicker from 'rm-emoji-picker';
-import { setTimeout } from 'timers';
 
 const defaultCategories = [
   {
@@ -33,7 +32,7 @@ const defaultCategories = [
 ];
 
 export default class LiteEditorEmojiPicker {
-  constructor ({
+  constructor({
     label = '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>', group, categories = defaultCategories,
     default_footer_message = 'Please select an emoji from the list above'
   }) {
@@ -50,7 +49,7 @@ export default class LiteEditorEmojiPicker {
     this.target = target;
   }
 
-  onClick ()  {
+  onClick() {
     const { editor, target, default_footer_message, categories } = this;
     const container = document.querySelector(`[data-id="${editor.id}"]`);
     const editable = container.querySelector('[data-selector="lite-editor"]');
@@ -71,7 +70,7 @@ export default class LiteEditorEmojiPicker {
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(() => {
         target.click();
-      })
+      });
     } else {
       setTimeout(() => {
         target.click();
@@ -79,7 +78,7 @@ export default class LiteEditorEmojiPicker {
     }
   }
 
-  onRender (editor, target) {
+  onRender(editor, target) {
     if (editor.data.showSource) {
       target.setAttribute('disabled', true);
     } else {

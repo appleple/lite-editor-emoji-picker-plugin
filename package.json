@@ -1,6 +1,6 @@
 {
   "name": "lite-editor-emoji-picker-plugin",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "lite-editor plugin for emojis",
   "main": "lib/index.js",
   "scripts": {

@@ -1,4 +1,4 @@
-(function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -16,7 +16,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 var morphdom = require('morphdom');
 var find = require('array.prototype.find');
 
-var eventType = 'input paste copy click change keydown keyup contextmenu mouseup mousedown mousemove touchstart touchend touchmove compositionstart compositionend focus';
+var eventType = 'input paste copy click change keydown keyup keypress contextmenu mouseup mousedown mousemove touchstart touchend touchmove compositionstart compositionend focus';
 var bindType = 'input change click';
 var dataAction = eventType.replace(/([a-z]+)/g, '[data-action-$1],') + '[data-action]';
 
@@ -470,8 +470,8 @@ var aTemplate = function () {
         } else if (renderWay === 'text') {
           target.innerText = html;
         } else if (part) {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
+          var doc = document.createElement('div');
+          doc.innerHTML = html;
           var partHtml = doc.querySelector(part).outerHTML;
           morphdom(target.querySelector(part), partHtml);
         } else {
@@ -576,7 +576,7 @@ var aTemplate = function () {
 
 exports.default = aTemplate;
 module.exports = exports['default'];
-},{"./util":2,"array.prototype.find":4,"morphdom":76}],2:[function(require,module,exports){
+},{"./util":2,"array.prototype.find":4,"morphdom":79}],2:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -643,7 +643,7 @@ module.exports = function find(predicate) {
 	return undefined;
 };
 
-},{"es-abstract/es6":37}],4:[function(require,module,exports){
+},{"es-abstract/es6":38}],4:[function(require,module,exports){
 'use strict';
 
 var define = require('define-properties');
@@ -671,7 +671,7 @@ define(boundFindShim, {
 
 module.exports = boundFindShim;
 
-},{"./implementation":3,"./polyfill":5,"./shim":6,"define-properties":13,"es-abstract/es6":37}],5:[function(require,module,exports){
+},{"./implementation":3,"./polyfill":5,"./shim":6,"define-properties":14,"es-abstract/es6":38}],5:[function(require,module,exports){
 'use strict';
 
 module.exports = function getPolyfill() {
@@ -704,7 +704,7 @@ module.exports = function shimArrayPrototypeFind() {
 	return polyfill;
 };
 
-},{"./polyfill":5,"define-properties":13}],7:[function(require,module,exports){
+},{"./polyfill":5,"define-properties":14}],7:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -726,65 +726,97 @@ for (var i = 0, len = code.length; i < len; ++i) {
 revLookup['-'.charCodeAt(0)] = 62
 revLookup['_'.charCodeAt(0)] = 63
 
-function placeHoldersCount (b64) {
+function getLens (b64) {
   var len = b64.length
+
   if (len % 4 > 0) {
     throw new Error('Invalid string. Length must be a multiple of 4')
   }
 
-  // the number of equal signs (place holders)
-  // if there are two placeholders, than the two characters before it
-  // represent one byte
-  // if there is only one, then the three characters before it represent 2 bytes
-  // this is just a cheap hack to not do indexOf twice
-  return b64[len - 2] === '=' ? 2 : b64[len - 1] === '=' ? 1 : 0
+  // Trim off extra bytes after placeholder bytes are found
+  // See: https://github.com/beatgammit/base64-js/issues/42
+  var validLen = b64.indexOf('=')
+  if (validLen === -1) validLen = len
+
+  var placeHoldersLen = validLen === len
+    ? 0
+    : 4 - (validLen % 4)
+
+  return [validLen, placeHoldersLen]
 }
 
+// base64 is 4/3 + up to two characters of the original data
 function byteLength (b64) {
-  // base64 is 4/3 + up to two characters of the original data
-  return (b64.length * 3 / 4) - placeHoldersCount(b64)
+  var lens = getLens(b64)
+  var validLen = lens[0]
+  var placeHoldersLen = lens[1]
+  return ((validLen + placeHoldersLen) * 3 / 4) - placeHoldersLen
+}
+
+function _byteLength (b64, validLen, placeHoldersLen) {
+  return ((validLen + placeHoldersLen) * 3 / 4) - placeHoldersLen
 }
 
 function toByteArray (b64) {
-  var i, l, tmp, placeHolders, arr
-  var len = b64.length
-  placeHolders = placeHoldersCount(b64)
+  var tmp
+  var lens = getLens(b64)
+  var validLen = lens[0]
+  var placeHoldersLen = lens[1]
 
-  arr = new Arr((len * 3 / 4) - placeHolders)
+  var arr = new Arr(_byteLength(b64, validLen, placeHoldersLen))
+
+  var curByte = 0
 
   // if there are placeholders, only get up to the last complete 4 chars
-  l = placeHolders > 0 ? len - 4 : len
+  var len = placeHoldersLen > 0
+    ? validLen - 4
+    : validLen
 
-  var L = 0
-
-  for (i = 0; i < l; i += 4) {
-    tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
-    arr[L++] = (tmp >> 16) & 0xFF
-    arr[L++] = (tmp >> 8) & 0xFF
-    arr[L++] = tmp & 0xFF
+  for (var i = 0; i < len; i += 4) {
+    tmp =
+      (revLookup[b64.charCodeAt(i)] << 18) |
+      (revLookup[b64.charCodeAt(i + 1)] << 12) |
+      (revLookup[b64.charCodeAt(i + 2)] << 6) |
+      revLookup[b64.charCodeAt(i + 3)]
+    arr[curByte++] = (tmp >> 16) & 0xFF
+    arr[curByte++] = (tmp >> 8) & 0xFF
+    arr[curByte++] = tmp & 0xFF
   }
 
-  if (placeHolders === 2) {
-    tmp = (revLookup[b64.charCodeAt(i)] << 2) | (revLookup[b64.charCodeAt(i + 1)] >> 4)
-    arr[L++] = tmp & 0xFF
-  } else if (placeHolders === 1) {
-    tmp = (revLookup[b64.charCodeAt(i)] << 10) | (revLookup[b64.charCodeAt(i + 1)] << 4) | (revLookup[b64.charCodeAt(i + 2)] >> 2)
-    arr[L++] = (tmp >> 8) & 0xFF
-    arr[L++] = tmp & 0xFF
+  if (placeHoldersLen === 2) {
+    tmp =
+      (revLookup[b64.charCodeAt(i)] << 2) |
+      (revLookup[b64.charCodeAt(i + 1)] >> 4)
+    arr[curByte++] = tmp & 0xFF
+  }
+
+  if (placeHoldersLen === 1) {
+    tmp =
+      (revLookup[b64.charCodeAt(i)] << 10) |
+      (revLookup[b64.charCodeAt(i + 1)] << 4) |
+      (revLookup[b64.charCodeAt(i + 2)] >> 2)
+    arr[curByte++] = (tmp >> 8) & 0xFF
+    arr[curByte++] = tmp & 0xFF
   }
 
   return arr
 }
 
 function tripletToBase64 (num) {
-  return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F]
+  return lookup[num >> 18 & 0x3F] +
+    lookup[num >> 12 & 0x3F] +
+    lookup[num >> 6 & 0x3F] +
+    lookup[num & 0x3F]
 }
 
 function encodeChunk (uint8, start, end) {
   var tmp
   var output = []
   for (var i = start; i < end; i += 3) {
-    tmp = ((uint8[i] << 16) & 0xFF0000) + ((uint8[i + 1] << 8) & 0xFF00) + (uint8[i + 2] & 0xFF)
+    tmp =
+      ((uint8[i] << 16) & 0xFF0000) +
+      ((uint8[i + 1] << 8) & 0xFF00) +
+      (uint8[i + 2] & 0xFF)
     output.push(tripletToBase64(tmp))
   }
   return output.join('')
@@ -794,30 +826,33 @@ function fromByteArray (uint8) {
   var tmp
   var len = uint8.length
   var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
-  var output = ''
   var parts = []
   var maxChunkLength = 16383 // must be multiple of 3
 
   // go through the array every three bytes, we'll deal with trailing stuff later
   for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
-    parts.push(encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)))
+    parts.push(encodeChunk(
+      uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)
+    ))
   }
 
   // pad the end with zeros, but make sure to not forget the extra bytes
   if (extraBytes === 1) {
     tmp = uint8[len - 1]
-    output += lookup[tmp >> 2]
-    output += lookup[(tmp << 4) & 0x3F]
-    output += '=='
+    parts.push(
+      lookup[tmp >> 2] +
+      lookup[(tmp << 4) & 0x3F] +
+      '=='
+    )
   } else if (extraBytes === 2) {
-    tmp = (uint8[len - 2] << 8) + (uint8[len - 1])
-    output += lookup[tmp >> 10]
-    output += lookup[(tmp >> 4) & 0x3F]
-    output += lookup[(tmp << 2) & 0x3F]
-    output += '='
+    tmp = (uint8[len - 2] << 8) + uint8[len - 1]
+    parts.push(
+      lookup[tmp >> 10] +
+      lookup[(tmp >> 4) & 0x3F] +
+      lookup[(tmp << 2) & 0x3F] +
+      '='
+    )
   }
-
-  parts.push(output)
 
   return parts.join('')
 }
@@ -2840,7 +2875,7 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":7,"ieee754":64,"isarray":71}],11:[function(require,module,exports){
+},{"base64-js":7,"ieee754":66,"isarray":73}],11:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -2951,7 +2986,53 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":66}],12:[function(require,module,exports){
+},{"../../is-buffer/index.js":68}],12:[function(require,module,exports){
+// Polyfill for creating CustomEvents on IE9/10/11
+
+// code pulled from:
+// https://github.com/d4tocchini/customevent-polyfill
+// https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent#Polyfill
+
+try {
+    var ce = new window.CustomEvent('test');
+    ce.preventDefault();
+    if (ce.defaultPrevented !== true) {
+        // IE has problems with .preventDefault() on custom events
+        // http://stackoverflow.com/questions/23349191
+        throw new Error('Could not prevent default');
+    }
+} catch(e) {
+  var CustomEvent = function(event, params) {
+    var evt, origPrevent;
+    params = params || {
+      bubbles: false,
+      cancelable: false,
+      detail: undefined
+    };
+
+    evt = document.createEvent("CustomEvent");
+    evt.initCustomEvent(event, params.bubbles, params.cancelable, params.detail);
+    origPrevent = evt.preventDefault;
+    evt.preventDefault = function () {
+      origPrevent.call(this);
+      try {
+        Object.defineProperty(this, 'defaultPrevented', {
+          get: function () {
+            return true;
+          }
+        });
+      } catch(e) {
+        this.defaultPrevented = true;
+      }
+    };
+    return evt;
+  };
+
+  CustomEvent.prototype = window.Event.prototype;
+  window.CustomEvent = CustomEvent; // expose definition to window
+}
+
+},{}],13:[function(require,module,exports){
 (function (Buffer){
 /*!
  * @description Recursive object extending
@@ -3099,7 +3180,7 @@ var deepExtend = module.exports = function (/*obj_1, [obj_2], [obj_N]*/) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":10}],13:[function(require,module,exports){
+},{"buffer":10}],14:[function(require,module,exports){
 'use strict';
 
 var keys = require('object-keys');
@@ -3157,7 +3238,7 @@ defineProperties.supportsDescriptors = !!supportsDescriptors;
 
 module.exports = defineProperties;
 
-},{"foreach":48,"object-keys":77}],14:[function(require,module,exports){
+},{"foreach":49,"object-keys":80}],15:[function(require,module,exports){
 /*
   Module dependencies
 */
@@ -3337,7 +3418,7 @@ function renderComment(elem) {
   return '<!--' + elem.data + '-->';
 }
 
-},{"domelementtype":15,"entities":27}],15:[function(require,module,exports){
+},{"domelementtype":16,"entities":28}],16:[function(require,module,exports){
 //Types of elements found in the DOM
 module.exports = {
 	Text: "text", //Text
@@ -3352,7 +3433,7 @@ module.exports = {
 		return elem.type === "tag" || elem.type === "script" || elem.type === "style";
 	}
 };
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 //Types of elements found in the DOM
 module.exports = {
 	Text: "text", //Text
@@ -3369,7 +3450,7 @@ module.exports = {
 	}
 };
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 var ElementType = require("domelementtype");
 
 var re_whitespace = /\s+/g;
@@ -3588,7 +3669,7 @@ DomHandler.prototype.onprocessinginstruction = function(name, data){
 
 module.exports = DomHandler;
 
-},{"./lib/element":18,"./lib/node":19,"domelementtype":16}],18:[function(require,module,exports){
+},{"./lib/element":19,"./lib/node":20,"domelementtype":17}],19:[function(require,module,exports){
 // DOM-Level-1-compliant structure
 var NodePrototype = require('./node');
 var ElementPrototype = module.exports = Object.create(NodePrototype);
@@ -3610,7 +3691,7 @@ Object.keys(domLvl1).forEach(function(key) {
 	});
 });
 
-},{"./node":19}],19:[function(require,module,exports){
+},{"./node":20}],20:[function(require,module,exports){
 // This object will be used as the prototype for Nodes when creating a
 // DOM-Level-1-compliant structure.
 var NodePrototype = module.exports = {
@@ -3656,7 +3737,7 @@ Object.keys(domLvl1).forEach(function(key) {
 	});
 });
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 var DomUtils = module.exports;
 
 [
@@ -3672,7 +3753,7 @@ var DomUtils = module.exports;
 	});
 });
 
-},{"./lib/helpers":21,"./lib/legacy":22,"./lib/manipulation":23,"./lib/querying":24,"./lib/stringify":25,"./lib/traversal":26}],21:[function(require,module,exports){
+},{"./lib/helpers":22,"./lib/legacy":23,"./lib/manipulation":24,"./lib/querying":25,"./lib/stringify":26,"./lib/traversal":27}],22:[function(require,module,exports){
 // removeSubsets
 // Given an array of nodes, remove any member that is contained by another.
 exports.removeSubsets = function(nodes) {
@@ -3815,7 +3896,7 @@ exports.uniqueSort = function(nodes) {
 	return nodes;
 };
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var ElementType = require("domelementtype");
 var isTag = exports.isTag = ElementType.isTag;
 
@@ -3904,7 +3985,7 @@ exports.getElementsByTagType = function(type, element, recurse, limit){
 	return this.filter(Checks.tag_type(type), element, recurse, limit);
 };
 
-},{"domelementtype":16}],23:[function(require,module,exports){
+},{"domelementtype":17}],24:[function(require,module,exports){
 exports.removeElement = function(elem){
 	if(elem.prev) elem.prev.next = elem.next;
 	if(elem.next) elem.next.prev = elem.prev;
@@ -3983,7 +4064,7 @@ exports.prepend = function(elem, prev){
 
 
 
-},{}],24:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 var isTag = require("domelementtype").isTag;
 
 module.exports = {
@@ -4080,7 +4161,7 @@ function findAll(test, rootElems){
 	return result;
 }
 
-},{"domelementtype":16}],25:[function(require,module,exports){
+},{"domelementtype":17}],26:[function(require,module,exports){
 var ElementType = require("domelementtype"),
     getOuterHTML = require("dom-serializer"),
     isTag = ElementType.isTag;
@@ -4105,7 +4186,7 @@ function getText(elem){
 	return "";
 }
 
-},{"dom-serializer":14,"domelementtype":16}],26:[function(require,module,exports){
+},{"dom-serializer":15,"domelementtype":17}],27:[function(require,module,exports){
 var getChildren = exports.getChildren = function(elem){
 	return elem.children;
 };
@@ -4131,7 +4212,7 @@ exports.getName = function(elem){
 	return elem.name;
 };
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 var encode = require("./lib/encode.js"),
     decode = require("./lib/decode.js");
 
@@ -4166,7 +4247,7 @@ exports.decodeHTMLStrict = decode.HTMLStrict;
 
 exports.escape = encode.escape;
 
-},{"./lib/decode.js":28,"./lib/encode.js":30}],28:[function(require,module,exports){
+},{"./lib/decode.js":29,"./lib/encode.js":31}],29:[function(require,module,exports){
 var entityMap = require("../maps/entities.json"),
     legacyMap = require("../maps/legacy.json"),
     xmlMap    = require("../maps/xml.json"),
@@ -4239,7 +4320,7 @@ module.exports = {
 	HTML: decodeHTML,
 	HTMLStrict: decodeHTMLStrict
 };
-},{"../maps/entities.json":32,"../maps/legacy.json":33,"../maps/xml.json":34,"./decode_codepoint.js":29}],29:[function(require,module,exports){
+},{"../maps/entities.json":33,"../maps/legacy.json":34,"../maps/xml.json":35,"./decode_codepoint.js":30}],30:[function(require,module,exports){
 var decodeMap = require("../maps/decode.json");
 
 module.exports = decodeCodePoint;
@@ -4267,7 +4348,7 @@ function decodeCodePoint(codePoint){
 	return output;
 }
 
-},{"../maps/decode.json":31}],30:[function(require,module,exports){
+},{"../maps/decode.json":32}],31:[function(require,module,exports){
 var inverseXML = getInverseObj(require("../maps/xml.json")),
     xmlReplacer = getInverseReplacer(inverseXML);
 
@@ -4342,16 +4423,16 @@ function escapeXML(data){
 
 exports.escape = escapeXML;
 
-},{"../maps/entities.json":32,"../maps/xml.json":34}],31:[function(require,module,exports){
+},{"../maps/entities.json":33,"../maps/xml.json":35}],32:[function(require,module,exports){
 module.exports={"0":65533,"128":8364,"130":8218,"131":402,"132":8222,"133":8230,"134":8224,"135":8225,"136":710,"137":8240,"138":352,"139":8249,"140":338,"142":381,"145":8216,"146":8217,"147":8220,"148":8221,"149":8226,"150":8211,"151":8212,"152":732,"153":8482,"154":353,"155":8250,"156":339,"158":382,"159":376}
-},{}],32:[function(require,module,exports){
-module.exports={"Aacute":"\u00C1","aacute":"\u00E1","Abreve":"\u0102","abreve":"\u0103","ac":"\u223E","acd":"\u223F","acE":"\u223E\u0333","Acirc":"\u00C2","acirc":"\u00E2","acute":"\u00B4","Acy":"\u0410","acy":"\u0430","AElig":"\u00C6","aelig":"\u00E6","af":"\u2061","Afr":"\uD835\uDD04","afr":"\uD835\uDD1E","Agrave":"\u00C0","agrave":"\u00E0","alefsym":"\u2135","aleph":"\u2135","Alpha":"\u0391","alpha":"\u03B1","Amacr":"\u0100","amacr":"\u0101","amalg":"\u2A3F","amp":"&","AMP":"&","andand":"\u2A55","And":"\u2A53","and":"\u2227","andd":"\u2A5C","andslope":"\u2A58","andv":"\u2A5A","ang":"\u2220","ange":"\u29A4","angle":"\u2220","angmsdaa":"\u29A8","angmsdab":"\u29A9","angmsdac":"\u29AA","angmsdad":"\u29AB","angmsdae":"\u29AC","angmsdaf":"\u29AD","angmsdag":"\u29AE","angmsdah":"\u29AF","angmsd":"\u2221","angrt":"\u221F","angrtvb":"\u22BE","angrtvbd":"\u299D","angsph":"\u2222","angst":"\u00C5","angzarr":"\u237C","Aogon":"\u0104","aogon":"\u0105","Aopf":"\uD835\uDD38","aopf":"\uD835\uDD52","apacir":"\u2A6F","ap":"\u2248","apE":"\u2A70","ape":"\u224A","apid":"\u224B","apos":"'","ApplyFunction":"\u2061","approx":"\u2248","approxeq":"\u224A","Aring":"\u00C5","aring":"\u00E5","Ascr":"\uD835\uDC9C","ascr":"\uD835\uDCB6","Assign":"\u2254","ast":"*","asymp":"\u2248","asympeq":"\u224D","Atilde":"\u00C3","atilde":"\u00E3","Auml":"\u00C4","auml":"\u00E4","awconint":"\u2233","awint":"\u2A11","backcong":"\u224C","backepsilon":"\u03F6","backprime":"\u2035","backsim":"\u223D","backsimeq":"\u22CD","Backslash":"\u2216","Barv":"\u2AE7","barvee":"\u22BD","barwed":"\u2305","Barwed":"\u2306","barwedge":"\u2305","bbrk":"\u23B5","bbrktbrk":"\u23B6","bcong":"\u224C","Bcy":"\u0411","bcy":"\u0431","bdquo":"\u201E","becaus":"\u2235","because":"\u2235","Because":"\u2235","bemptyv":"\u29B0","bepsi":"\u03F6","bernou":"\u212C","Bernoullis":"\u212C","Beta":"\u0392","beta":"\u03B2","beth":"\u2136","between":"\u226C","Bfr":"\uD835\uDD05","bfr":"\uD835\uDD1F","bigcap":"\u22C2","bigcirc":"\u25EF","bigcup":"\u22C3","bigodot":"\u2A00","bigoplus":"\u2A01","bigotimes":"\u2A02","bigsqcup":"\u2A06","bigstar":"\u2605","bigtriangledown":"\u25BD","bigtriangleup":"\u25B3","biguplus":"\u2A04","bigvee":"\u22C1","bigwedge":"\u22C0","bkarow":"\u290D","blacklozenge":"\u29EB","blacksquare":"\u25AA","blacktriangle":"\u25B4","blacktriangledown":"\u25BE","blacktriangleleft":"\u25C2","blacktriangleright":"\u25B8","blank":"\u2423","blk12":"\u2592","blk14":"\u2591","blk34":"\u2593","block":"\u2588","bne":"=\u20E5","bnequiv":"\u2261\u20E5","bNot":"\u2AED","bnot":"\u2310","Bopf":"\uD835\uDD39","bopf":"\uD835\uDD53","bot":"\u22A5","bottom":"\u22A5","bowtie":"\u22C8","boxbox":"\u29C9","boxdl":"\u2510","boxdL":"\u2555","boxDl":"\u2556","boxDL":"\u2557","boxdr":"\u250C","boxdR":"\u2552","boxDr":"\u2553","boxDR":"\u2554","boxh":"\u2500","boxH":"\u2550","boxhd":"\u252C","boxHd":"\u2564","boxhD":"\u2565","boxHD":"\u2566","boxhu":"\u2534","boxHu":"\u2567","boxhU":"\u2568","boxHU":"\u2569","boxminus":"\u229F","boxplus":"\u229E","boxtimes":"\u22A0","boxul":"\u2518","boxuL":"\u255B","boxUl":"\u255C","boxUL":"\u255D","boxur":"\u2514","boxuR":"\u2558","boxUr":"\u2559","boxUR":"\u255A","boxv":"\u2502","boxV":"\u2551","boxvh":"\u253C","boxvH":"\u256A","boxVh":"\u256B","boxVH":"\u256C","boxvl":"\u2524","boxvL":"\u2561","boxVl":"\u2562","boxVL":"\u2563","boxvr":"\u251C","boxvR":"\u255E","boxVr":"\u255F","boxVR":"\u2560","bprime":"\u2035","breve":"\u02D8","Breve":"\u02D8","brvbar":"\u00A6","bscr":"\uD835\uDCB7","Bscr":"\u212C","bsemi":"\u204F","bsim":"\u223D","bsime":"\u22CD","bsolb":"\u29C5","bsol":"\\","bsolhsub":"\u27C8","bull":"\u2022","bullet":"\u2022","bump":"\u224E","bumpE":"\u2AAE","bumpe":"\u224F","Bumpeq":"\u224E","bumpeq":"\u224F","Cacute":"\u0106","cacute":"\u0107","capand":"\u2A44","capbrcup":"\u2A49","capcap":"\u2A4B","cap":"\u2229","Cap":"\u22D2","capcup":"\u2A47","capdot":"\u2A40","CapitalDifferentialD":"\u2145","caps":"\u2229\uFE00","caret":"\u2041","caron":"\u02C7","Cayleys":"\u212D","ccaps":"\u2A4D","Ccaron":"\u010C","ccaron":"\u010D","Ccedil":"\u00C7","ccedil":"\u00E7","Ccirc":"\u0108","ccirc":"\u0109","Cconint":"\u2230","ccups":"\u2A4C","ccupssm":"\u2A50","Cdot":"\u010A","cdot":"\u010B","cedil":"\u00B8","Cedilla":"\u00B8","cemptyv":"\u29B2","cent":"\u00A2","centerdot":"\u00B7","CenterDot":"\u00B7","cfr":"\uD835\uDD20","Cfr":"\u212D","CHcy":"\u0427","chcy":"\u0447","check":"\u2713","checkmark":"\u2713","Chi":"\u03A7","chi":"\u03C7","circ":"\u02C6","circeq":"\u2257","circlearrowleft":"\u21BA","circlearrowright":"\u21BB","circledast":"\u229B","circledcirc":"\u229A","circleddash":"\u229D","CircleDot":"\u2299","circledR":"\u00AE","circledS":"\u24C8","CircleMinus":"\u2296","CirclePlus":"\u2295","CircleTimes":"\u2297","cir":"\u25CB","cirE":"\u29C3","cire":"\u2257","cirfnint":"\u2A10","cirmid":"\u2AEF","cirscir":"\u29C2","ClockwiseContourIntegral":"\u2232","CloseCurlyDoubleQuote":"\u201D","CloseCurlyQuote":"\u2019","clubs":"\u2663","clubsuit":"\u2663","colon":":","Colon":"\u2237","Colone":"\u2A74","colone":"\u2254","coloneq":"\u2254","comma":",","commat":"@","comp":"\u2201","compfn":"\u2218","complement":"\u2201","complexes":"\u2102","cong":"\u2245","congdot":"\u2A6D","Congruent":"\u2261","conint":"\u222E","Conint":"\u222F","ContourIntegral":"\u222E","copf":"\uD835\uDD54","Copf":"\u2102","coprod":"\u2210","Coproduct":"\u2210","copy":"\u00A9","COPY":"\u00A9","copysr":"\u2117","CounterClockwiseContourIntegral":"\u2233","crarr":"\u21B5","cross":"\u2717","Cross":"\u2A2F","Cscr":"\uD835\uDC9E","cscr":"\uD835\uDCB8","csub":"\u2ACF","csube":"\u2AD1","csup":"\u2AD0","csupe":"\u2AD2","ctdot":"\u22EF","cudarrl":"\u2938","cudarrr":"\u2935","cuepr":"\u22DE","cuesc":"\u22DF","cularr":"\u21B6","cularrp":"\u293D","cupbrcap":"\u2A48","cupcap":"\u2A46","CupCap":"\u224D","cup":"\u222A","Cup":"\u22D3","cupcup":"\u2A4A","cupdot":"\u228D","cupor":"\u2A45","cups":"\u222A\uFE00","curarr":"\u21B7","curarrm":"\u293C","curlyeqprec":"\u22DE","curlyeqsucc":"\u22DF","curlyvee":"\u22CE","curlywedge":"\u22CF","curren":"\u00A4","curvearrowleft":"\u21B6","curvearrowright":"\u21B7","cuvee":"\u22CE","cuwed":"\u22CF","cwconint":"\u2232","cwint":"\u2231","cylcty":"\u232D","dagger":"\u2020","Dagger":"\u2021","daleth":"\u2138","darr":"\u2193","Darr":"\u21A1","dArr":"\u21D3","dash":"\u2010","Dashv":"\u2AE4","dashv":"\u22A3","dbkarow":"\u290F","dblac":"\u02DD","Dcaron":"\u010E","dcaron":"\u010F","Dcy":"\u0414","dcy":"\u0434","ddagger":"\u2021","ddarr":"\u21CA","DD":"\u2145","dd":"\u2146","DDotrahd":"\u2911","ddotseq":"\u2A77","deg":"\u00B0","Del":"\u2207","Delta":"\u0394","delta":"\u03B4","demptyv":"\u29B1","dfisht":"\u297F","Dfr":"\uD835\uDD07","dfr":"\uD835\uDD21","dHar":"\u2965","dharl":"\u21C3","dharr":"\u21C2","DiacriticalAcute":"\u00B4","DiacriticalDot":"\u02D9","DiacriticalDoubleAcute":"\u02DD","DiacriticalGrave":"`","DiacriticalTilde":"\u02DC","diam":"\u22C4","diamond":"\u22C4","Diamond":"\u22C4","diamondsuit":"\u2666","diams":"\u2666","die":"\u00A8","DifferentialD":"\u2146","digamma":"\u03DD","disin":"\u22F2","div":"\u00F7","divide":"\u00F7","divideontimes":"\u22C7","divonx":"\u22C7","DJcy":"\u0402","djcy":"\u0452","dlcorn":"\u231E","dlcrop":"\u230D","dollar":"$","Dopf":"\uD835\uDD3B","dopf":"\uD835\uDD55","Dot":"\u00A8","dot":"\u02D9","DotDot":"\u20DC","doteq":"\u2250","doteqdot":"\u2251","DotEqual":"\u2250","dotminus":"\u2238","dotplus":"\u2214","dotsquare":"\u22A1","doublebarwedge":"\u2306","DoubleContourIntegral":"\u222F","DoubleDot":"\u00A8","DoubleDownArrow":"\u21D3","DoubleLeftArrow":"\u21D0","DoubleLeftRightArrow":"\u21D4","DoubleLeftTee":"\u2AE4","DoubleLongLeftArrow":"\u27F8","DoubleLongLeftRightArrow":"\u27FA","DoubleLongRightArrow":"\u27F9","DoubleRightArrow":"\u21D2","DoubleRightTee":"\u22A8","DoubleUpArrow":"\u21D1","DoubleUpDownArrow":"\u21D5","DoubleVerticalBar":"\u2225","DownArrowBar":"\u2913","downarrow":"\u2193","DownArrow":"\u2193","Downarrow":"\u21D3","DownArrowUpArrow":"\u21F5","DownBreve":"\u0311","downdownarrows":"\u21CA","downharpoonleft":"\u21C3","downharpoonright":"\u21C2","DownLeftRightVector":"\u2950","DownLeftTeeVector":"\u295E","DownLeftVectorBar":"\u2956","DownLeftVector":"\u21BD","DownRightTeeVector":"\u295F","DownRightVectorBar":"\u2957","DownRightVector":"\u21C1","DownTeeArrow":"\u21A7","DownTee":"\u22A4","drbkarow":"\u2910","drcorn":"\u231F","drcrop":"\u230C","Dscr":"\uD835\uDC9F","dscr":"\uD835\uDCB9","DScy":"\u0405","dscy":"\u0455","dsol":"\u29F6","Dstrok":"\u0110","dstrok":"\u0111","dtdot":"\u22F1","dtri":"\u25BF","dtrif":"\u25BE","duarr":"\u21F5","duhar":"\u296F","dwangle":"\u29A6","DZcy":"\u040F","dzcy":"\u045F","dzigrarr":"\u27FF","Eacute":"\u00C9","eacute":"\u00E9","easter":"\u2A6E","Ecaron":"\u011A","ecaron":"\u011B","Ecirc":"\u00CA","ecirc":"\u00EA","ecir":"\u2256","ecolon":"\u2255","Ecy":"\u042D","ecy":"\u044D","eDDot":"\u2A77","Edot":"\u0116","edot":"\u0117","eDot":"\u2251","ee":"\u2147","efDot":"\u2252","Efr":"\uD835\uDD08","efr":"\uD835\uDD22","eg":"\u2A9A","Egrave":"\u00C8","egrave":"\u00E8","egs":"\u2A96","egsdot":"\u2A98","el":"\u2A99","Element":"\u2208","elinters":"\u23E7","ell":"\u2113","els":"\u2A95","elsdot":"\u2A97","Emacr":"\u0112","emacr":"\u0113","empty":"\u2205","emptyset":"\u2205","EmptySmallSquare":"\u25FB","emptyv":"\u2205","EmptyVerySmallSquare":"\u25AB","emsp13":"\u2004","emsp14":"\u2005","emsp":"\u2003","ENG":"\u014A","eng":"\u014B","ensp":"\u2002","Eogon":"\u0118","eogon":"\u0119","Eopf":"\uD835\uDD3C","eopf":"\uD835\uDD56","epar":"\u22D5","eparsl":"\u29E3","eplus":"\u2A71","epsi":"\u03B5","Epsilon":"\u0395","epsilon":"\u03B5","epsiv":"\u03F5","eqcirc":"\u2256","eqcolon":"\u2255","eqsim":"\u2242","eqslantgtr":"\u2A96","eqslantless":"\u2A95","Equal":"\u2A75","equals":"=","EqualTilde":"\u2242","equest":"\u225F","Equilibrium":"\u21CC","equiv":"\u2261","equivDD":"\u2A78","eqvparsl":"\u29E5","erarr":"\u2971","erDot":"\u2253","escr":"\u212F","Escr":"\u2130","esdot":"\u2250","Esim":"\u2A73","esim":"\u2242","Eta":"\u0397","eta":"\u03B7","ETH":"\u00D0","eth":"\u00F0","Euml":"\u00CB","euml":"\u00EB","euro":"\u20AC","excl":"!","exist":"\u2203","Exists":"\u2203","expectation":"\u2130","exponentiale":"\u2147","ExponentialE":"\u2147","fallingdotseq":"\u2252","Fcy":"\u0424","fcy":"\u0444","female":"\u2640","ffilig":"\uFB03","fflig":"\uFB00","ffllig":"\uFB04","Ffr":"\uD835\uDD09","ffr":"\uD835\uDD23","filig":"\uFB01","FilledSmallSquare":"\u25FC","FilledVerySmallSquare":"\u25AA","fjlig":"fj","flat":"\u266D","fllig":"\uFB02","fltns":"\u25B1","fnof":"\u0192","Fopf":"\uD835\uDD3D","fopf":"\uD835\uDD57","forall":"\u2200","ForAll":"\u2200","fork":"\u22D4","forkv":"\u2AD9","Fouriertrf":"\u2131","fpartint":"\u2A0D","frac12":"\u00BD","frac13":"\u2153","frac14":"\u00BC","frac15":"\u2155","frac16":"\u2159","frac18":"\u215B","frac23":"\u2154","frac25":"\u2156","frac34":"\u00BE","frac35":"\u2157","frac38":"\u215C","frac45":"\u2158","frac56":"\u215A","frac58":"\u215D","frac78":"\u215E","frasl":"\u2044","frown":"\u2322","fscr":"\uD835\uDCBB","Fscr":"\u2131","gacute":"\u01F5","Gamma":"\u0393","gamma":"\u03B3","Gammad":"\u03DC","gammad":"\u03DD","gap":"\u2A86","Gbreve":"\u011E","gbreve":"\u011F","Gcedil":"\u0122","Gcirc":"\u011C","gcirc":"\u011D","Gcy":"\u0413","gcy":"\u0433","Gdot":"\u0120","gdot":"\u0121","ge":"\u2265","gE":"\u2267","gEl":"\u2A8C","gel":"\u22DB","geq":"\u2265","geqq":"\u2267","geqslant":"\u2A7E","gescc":"\u2AA9","ges":"\u2A7E","gesdot":"\u2A80","gesdoto":"\u2A82","gesdotol":"\u2A84","gesl":"\u22DB\uFE00","gesles":"\u2A94","Gfr":"\uD835\uDD0A","gfr":"\uD835\uDD24","gg":"\u226B","Gg":"\u22D9","ggg":"\u22D9","gimel":"\u2137","GJcy":"\u0403","gjcy":"\u0453","gla":"\u2AA5","gl":"\u2277","glE":"\u2A92","glj":"\u2AA4","gnap":"\u2A8A","gnapprox":"\u2A8A","gne":"\u2A88","gnE":"\u2269","gneq":"\u2A88","gneqq":"\u2269","gnsim":"\u22E7","Gopf":"\uD835\uDD3E","gopf":"\uD835\uDD58","grave":"`","GreaterEqual":"\u2265","GreaterEqualLess":"\u22DB","GreaterFullEqual":"\u2267","GreaterGreater":"\u2AA2","GreaterLess":"\u2277","GreaterSlantEqual":"\u2A7E","GreaterTilde":"\u2273","Gscr":"\uD835\uDCA2","gscr":"\u210A","gsim":"\u2273","gsime":"\u2A8E","gsiml":"\u2A90","gtcc":"\u2AA7","gtcir":"\u2A7A","gt":">","GT":">","Gt":"\u226B","gtdot":"\u22D7","gtlPar":"\u2995","gtquest":"\u2A7C","gtrapprox":"\u2A86","gtrarr":"\u2978","gtrdot":"\u22D7","gtreqless":"\u22DB","gtreqqless":"\u2A8C","gtrless":"\u2277","gtrsim":"\u2273","gvertneqq":"\u2269\uFE00","gvnE":"\u2269\uFE00","Hacek":"\u02C7","hairsp":"\u200A","half":"\u00BD","hamilt":"\u210B","HARDcy":"\u042A","hardcy":"\u044A","harrcir":"\u2948","harr":"\u2194","hArr":"\u21D4","harrw":"\u21AD","Hat":"^","hbar":"\u210F","Hcirc":"\u0124","hcirc":"\u0125","hearts":"\u2665","heartsuit":"\u2665","hellip":"\u2026","hercon":"\u22B9","hfr":"\uD835\uDD25","Hfr":"\u210C","HilbertSpace":"\u210B","hksearow":"\u2925","hkswarow":"\u2926","hoarr":"\u21FF","homtht":"\u223B","hookleftarrow":"\u21A9","hookrightarrow":"\u21AA","hopf":"\uD835\uDD59","Hopf":"\u210D","horbar":"\u2015","HorizontalLine":"\u2500","hscr":"\uD835\uDCBD","Hscr":"\u210B","hslash":"\u210F","Hstrok":"\u0126","hstrok":"\u0127","HumpDownHump":"\u224E","HumpEqual":"\u224F","hybull":"\u2043","hyphen":"\u2010","Iacute":"\u00CD","iacute":"\u00ED","ic":"\u2063","Icirc":"\u00CE","icirc":"\u00EE","Icy":"\u0418","icy":"\u0438","Idot":"\u0130","IEcy":"\u0415","iecy":"\u0435","iexcl":"\u00A1","iff":"\u21D4","ifr":"\uD835\uDD26","Ifr":"\u2111","Igrave":"\u00CC","igrave":"\u00EC","ii":"\u2148","iiiint":"\u2A0C","iiint":"\u222D","iinfin":"\u29DC","iiota":"\u2129","IJlig":"\u0132","ijlig":"\u0133","Imacr":"\u012A","imacr":"\u012B","image":"\u2111","ImaginaryI":"\u2148","imagline":"\u2110","imagpart":"\u2111","imath":"\u0131","Im":"\u2111","imof":"\u22B7","imped":"\u01B5","Implies":"\u21D2","incare":"\u2105","in":"\u2208","infin":"\u221E","infintie":"\u29DD","inodot":"\u0131","intcal":"\u22BA","int":"\u222B","Int":"\u222C","integers":"\u2124","Integral":"\u222B","intercal":"\u22BA","Intersection":"\u22C2","intlarhk":"\u2A17","intprod":"\u2A3C","InvisibleComma":"\u2063","InvisibleTimes":"\u2062","IOcy":"\u0401","iocy":"\u0451","Iogon":"\u012E","iogon":"\u012F","Iopf":"\uD835\uDD40","iopf":"\uD835\uDD5A","Iota":"\u0399","iota":"\u03B9","iprod":"\u2A3C","iquest":"\u00BF","iscr":"\uD835\uDCBE","Iscr":"\u2110","isin":"\u2208","isindot":"\u22F5","isinE":"\u22F9","isins":"\u22F4","isinsv":"\u22F3","isinv":"\u2208","it":"\u2062","Itilde":"\u0128","itilde":"\u0129","Iukcy":"\u0406","iukcy":"\u0456","Iuml":"\u00CF","iuml":"\u00EF","Jcirc":"\u0134","jcirc":"\u0135","Jcy":"\u0419","jcy":"\u0439","Jfr":"\uD835\uDD0D","jfr":"\uD835\uDD27","jmath":"\u0237","Jopf":"\uD835\uDD41","jopf":"\uD835\uDD5B","Jscr":"\uD835\uDCA5","jscr":"\uD835\uDCBF","Jsercy":"\u0408","jsercy":"\u0458","Jukcy":"\u0404","jukcy":"\u0454","Kappa":"\u039A","kappa":"\u03BA","kappav":"\u03F0","Kcedil":"\u0136","kcedil":"\u0137","Kcy":"\u041A","kcy":"\u043A","Kfr":"\uD835\uDD0E","kfr":"\uD835\uDD28","kgreen":"\u0138","KHcy":"\u0425","khcy":"\u0445","KJcy":"\u040C","kjcy":"\u045C","Kopf":"\uD835\uDD42","kopf":"\uD835\uDD5C","Kscr":"\uD835\uDCA6","kscr":"\uD835\uDCC0","lAarr":"\u21DA","Lacute":"\u0139","lacute":"\u013A","laemptyv":"\u29B4","lagran":"\u2112","Lambda":"\u039B","lambda":"\u03BB","lang":"\u27E8","Lang":"\u27EA","langd":"\u2991","langle":"\u27E8","lap":"\u2A85","Laplacetrf":"\u2112","laquo":"\u00AB","larrb":"\u21E4","larrbfs":"\u291F","larr":"\u2190","Larr":"\u219E","lArr":"\u21D0","larrfs":"\u291D","larrhk":"\u21A9","larrlp":"\u21AB","larrpl":"\u2939","larrsim":"\u2973","larrtl":"\u21A2","latail":"\u2919","lAtail":"\u291B","lat":"\u2AAB","late":"\u2AAD","lates":"\u2AAD\uFE00","lbarr":"\u290C","lBarr":"\u290E","lbbrk":"\u2772","lbrace":"{","lbrack":"[","lbrke":"\u298B","lbrksld":"\u298F","lbrkslu":"\u298D","Lcaron":"\u013D","lcaron":"\u013E","Lcedil":"\u013B","lcedil":"\u013C","lceil":"\u2308","lcub":"{","Lcy":"\u041B","lcy":"\u043B","ldca":"\u2936","ldquo":"\u201C","ldquor":"\u201E","ldrdhar":"\u2967","ldrushar":"\u294B","ldsh":"\u21B2","le":"\u2264","lE":"\u2266","LeftAngleBracket":"\u27E8","LeftArrowBar":"\u21E4","leftarrow":"\u2190","LeftArrow":"\u2190","Leftarrow":"\u21D0","LeftArrowRightArrow":"\u21C6","leftarrowtail":"\u21A2","LeftCeiling":"\u2308","LeftDoubleBracket":"\u27E6","LeftDownTeeVector":"\u2961","LeftDownVectorBar":"\u2959","LeftDownVector":"\u21C3","LeftFloor":"\u230A","leftharpoondown":"\u21BD","leftharpoonup":"\u21BC","leftleftarrows":"\u21C7","leftrightarrow":"\u2194","LeftRightArrow":"\u2194","Leftrightarrow":"\u21D4","leftrightarrows":"\u21C6","leftrightharpoons":"\u21CB","leftrightsquigarrow":"\u21AD","LeftRightVector":"\u294E","LeftTeeArrow":"\u21A4","LeftTee":"\u22A3","LeftTeeVector":"\u295A","leftthreetimes":"\u22CB","LeftTriangleBar":"\u29CF","LeftTriangle":"\u22B2","LeftTriangleEqual":"\u22B4","LeftUpDownVector":"\u2951","LeftUpTeeVector":"\u2960","LeftUpVectorBar":"\u2958","LeftUpVector":"\u21BF","LeftVectorBar":"\u2952","LeftVector":"\u21BC","lEg":"\u2A8B","leg":"\u22DA","leq":"\u2264","leqq":"\u2266","leqslant":"\u2A7D","lescc":"\u2AA8","les":"\u2A7D","lesdot":"\u2A7F","lesdoto":"\u2A81","lesdotor":"\u2A83","lesg":"\u22DA\uFE00","lesges":"\u2A93","lessapprox":"\u2A85","lessdot":"\u22D6","lesseqgtr":"\u22DA","lesseqqgtr":"\u2A8B","LessEqualGreater":"\u22DA","LessFullEqual":"\u2266","LessGreater":"\u2276","lessgtr":"\u2276","LessLess":"\u2AA1","lesssim":"\u2272","LessSlantEqual":"\u2A7D","LessTilde":"\u2272","lfisht":"\u297C","lfloor":"\u230A","Lfr":"\uD835\uDD0F","lfr":"\uD835\uDD29","lg":"\u2276","lgE":"\u2A91","lHar":"\u2962","lhard":"\u21BD","lharu":"\u21BC","lharul":"\u296A","lhblk":"\u2584","LJcy":"\u0409","ljcy":"\u0459","llarr":"\u21C7","ll":"\u226A","Ll":"\u22D8","llcorner":"\u231E","Lleftarrow":"\u21DA","llhard":"\u296B","lltri":"\u25FA","Lmidot":"\u013F","lmidot":"\u0140","lmoustache":"\u23B0","lmoust":"\u23B0","lnap":"\u2A89","lnapprox":"\u2A89","lne":"\u2A87","lnE":"\u2268","lneq":"\u2A87","lneqq":"\u2268","lnsim":"\u22E6","loang":"\u27EC","loarr":"\u21FD","lobrk":"\u27E6","longleftarrow":"\u27F5","LongLeftArrow":"\u27F5","Longleftarrow":"\u27F8","longleftrightarrow":"\u27F7","LongLeftRightArrow":"\u27F7","Longleftrightarrow":"\u27FA","longmapsto":"\u27FC","longrightarrow":"\u27F6","LongRightArrow":"\u27F6","Longrightarrow":"\u27F9","looparrowleft":"\u21AB","looparrowright":"\u21AC","lopar":"\u2985","Lopf":"\uD835\uDD43","lopf":"\uD835\uDD5D","loplus":"\u2A2D","lotimes":"\u2A34","lowast":"\u2217","lowbar":"_","LowerLeftArrow":"\u2199","LowerRightArrow":"\u2198","loz":"\u25CA","lozenge":"\u25CA","lozf":"\u29EB","lpar":"(","lparlt":"\u2993","lrarr":"\u21C6","lrcorner":"\u231F","lrhar":"\u21CB","lrhard":"\u296D","lrm":"\u200E","lrtri":"\u22BF","lsaquo":"\u2039","lscr":"\uD835\uDCC1","Lscr":"\u2112","lsh":"\u21B0","Lsh":"\u21B0","lsim":"\u2272","lsime":"\u2A8D","lsimg":"\u2A8F","lsqb":"[","lsquo":"\u2018","lsquor":"\u201A","Lstrok":"\u0141","lstrok":"\u0142","ltcc":"\u2AA6","ltcir":"\u2A79","lt":"<","LT":"<","Lt":"\u226A","ltdot":"\u22D6","lthree":"\u22CB","ltimes":"\u22C9","ltlarr":"\u2976","ltquest":"\u2A7B","ltri":"\u25C3","ltrie":"\u22B4","ltrif":"\u25C2","ltrPar":"\u2996","lurdshar":"\u294A","luruhar":"\u2966","lvertneqq":"\u2268\uFE00","lvnE":"\u2268\uFE00","macr":"\u00AF","male":"\u2642","malt":"\u2720","maltese":"\u2720","Map":"\u2905","map":"\u21A6","mapsto":"\u21A6","mapstodown":"\u21A7","mapstoleft":"\u21A4","mapstoup":"\u21A5","marker":"\u25AE","mcomma":"\u2A29","Mcy":"\u041C","mcy":"\u043C","mdash":"\u2014","mDDot":"\u223A","measuredangle":"\u2221","MediumSpace":"\u205F","Mellintrf":"\u2133","Mfr":"\uD835\uDD10","mfr":"\uD835\uDD2A","mho":"\u2127","micro":"\u00B5","midast":"*","midcir":"\u2AF0","mid":"\u2223","middot":"\u00B7","minusb":"\u229F","minus":"\u2212","minusd":"\u2238","minusdu":"\u2A2A","MinusPlus":"\u2213","mlcp":"\u2ADB","mldr":"\u2026","mnplus":"\u2213","models":"\u22A7","Mopf":"\uD835\uDD44","mopf":"\uD835\uDD5E","mp":"\u2213","mscr":"\uD835\uDCC2","Mscr":"\u2133","mstpos":"\u223E","Mu":"\u039C","mu":"\u03BC","multimap":"\u22B8","mumap":"\u22B8","nabla":"\u2207","Nacute":"\u0143","nacute":"\u0144","nang":"\u2220\u20D2","nap":"\u2249","napE":"\u2A70\u0338","napid":"\u224B\u0338","napos":"\u0149","napprox":"\u2249","natural":"\u266E","naturals":"\u2115","natur":"\u266E","nbsp":"\u00A0","nbump":"\u224E\u0338","nbumpe":"\u224F\u0338","ncap":"\u2A43","Ncaron":"\u0147","ncaron":"\u0148","Ncedil":"\u0145","ncedil":"\u0146","ncong":"\u2247","ncongdot":"\u2A6D\u0338","ncup":"\u2A42","Ncy":"\u041D","ncy":"\u043D","ndash":"\u2013","nearhk":"\u2924","nearr":"\u2197","neArr":"\u21D7","nearrow":"\u2197","ne":"\u2260","nedot":"\u2250\u0338","NegativeMediumSpace":"\u200B","NegativeThickSpace":"\u200B","NegativeThinSpace":"\u200B","NegativeVeryThinSpace":"\u200B","nequiv":"\u2262","nesear":"\u2928","nesim":"\u2242\u0338","NestedGreaterGreater":"\u226B","NestedLessLess":"\u226A","NewLine":"\n","nexist":"\u2204","nexists":"\u2204","Nfr":"\uD835\uDD11","nfr":"\uD835\uDD2B","ngE":"\u2267\u0338","nge":"\u2271","ngeq":"\u2271","ngeqq":"\u2267\u0338","ngeqslant":"\u2A7E\u0338","nges":"\u2A7E\u0338","nGg":"\u22D9\u0338","ngsim":"\u2275","nGt":"\u226B\u20D2","ngt":"\u226F","ngtr":"\u226F","nGtv":"\u226B\u0338","nharr":"\u21AE","nhArr":"\u21CE","nhpar":"\u2AF2","ni":"\u220B","nis":"\u22FC","nisd":"\u22FA","niv":"\u220B","NJcy":"\u040A","njcy":"\u045A","nlarr":"\u219A","nlArr":"\u21CD","nldr":"\u2025","nlE":"\u2266\u0338","nle":"\u2270","nleftarrow":"\u219A","nLeftarrow":"\u21CD","nleftrightarrow":"\u21AE","nLeftrightarrow":"\u21CE","nleq":"\u2270","nleqq":"\u2266\u0338","nleqslant":"\u2A7D\u0338","nles":"\u2A7D\u0338","nless":"\u226E","nLl":"\u22D8\u0338","nlsim":"\u2274","nLt":"\u226A\u20D2","nlt":"\u226E","nltri":"\u22EA","nltrie":"\u22EC","nLtv":"\u226A\u0338","nmid":"\u2224","NoBreak":"\u2060","NonBreakingSpace":"\u00A0","nopf":"\uD835\uDD5F","Nopf":"\u2115","Not":"\u2AEC","not":"\u00AC","NotCongruent":"\u2262","NotCupCap":"\u226D","NotDoubleVerticalBar":"\u2226","NotElement":"\u2209","NotEqual":"\u2260","NotEqualTilde":"\u2242\u0338","NotExists":"\u2204","NotGreater":"\u226F","NotGreaterEqual":"\u2271","NotGreaterFullEqual":"\u2267\u0338","NotGreaterGreater":"\u226B\u0338","NotGreaterLess":"\u2279","NotGreaterSlantEqual":"\u2A7E\u0338","NotGreaterTilde":"\u2275","NotHumpDownHump":"\u224E\u0338","NotHumpEqual":"\u224F\u0338","notin":"\u2209","notindot":"\u22F5\u0338","notinE":"\u22F9\u0338","notinva":"\u2209","notinvb":"\u22F7","notinvc":"\u22F6","NotLeftTriangleBar":"\u29CF\u0338","NotLeftTriangle":"\u22EA","NotLeftTriangleEqual":"\u22EC","NotLess":"\u226E","NotLessEqual":"\u2270","NotLessGreater":"\u2278","NotLessLess":"\u226A\u0338","NotLessSlantEqual":"\u2A7D\u0338","NotLessTilde":"\u2274","NotNestedGreaterGreater":"\u2AA2\u0338","NotNestedLessLess":"\u2AA1\u0338","notni":"\u220C","notniva":"\u220C","notnivb":"\u22FE","notnivc":"\u22FD","NotPrecedes":"\u2280","NotPrecedesEqual":"\u2AAF\u0338","NotPrecedesSlantEqual":"\u22E0","NotReverseElement":"\u220C","NotRightTriangleBar":"\u29D0\u0338","NotRightTriangle":"\u22EB","NotRightTriangleEqual":"\u22ED","NotSquareSubset":"\u228F\u0338","NotSquareSubsetEqual":"\u22E2","NotSquareSuperset":"\u2290\u0338","NotSquareSupersetEqual":"\u22E3","NotSubset":"\u2282\u20D2","NotSubsetEqual":"\u2288","NotSucceeds":"\u2281","NotSucceedsEqual":"\u2AB0\u0338","NotSucceedsSlantEqual":"\u22E1","NotSucceedsTilde":"\u227F\u0338","NotSuperset":"\u2283\u20D2","NotSupersetEqual":"\u2289","NotTilde":"\u2241","NotTildeEqual":"\u2244","NotTildeFullEqual":"\u2247","NotTildeTilde":"\u2249","NotVerticalBar":"\u2224","nparallel":"\u2226","npar":"\u2226","nparsl":"\u2AFD\u20E5","npart":"\u2202\u0338","npolint":"\u2A14","npr":"\u2280","nprcue":"\u22E0","nprec":"\u2280","npreceq":"\u2AAF\u0338","npre":"\u2AAF\u0338","nrarrc":"\u2933\u0338","nrarr":"\u219B","nrArr":"\u21CF","nrarrw":"\u219D\u0338","nrightarrow":"\u219B","nRightarrow":"\u21CF","nrtri":"\u22EB","nrtrie":"\u22ED","nsc":"\u2281","nsccue":"\u22E1","nsce":"\u2AB0\u0338","Nscr":"\uD835\uDCA9","nscr":"\uD835\uDCC3","nshortmid":"\u2224","nshortparallel":"\u2226","nsim":"\u2241","nsime":"\u2244","nsimeq":"\u2244","nsmid":"\u2224","nspar":"\u2226","nsqsube":"\u22E2","nsqsupe":"\u22E3","nsub":"\u2284","nsubE":"\u2AC5\u0338","nsube":"\u2288","nsubset":"\u2282\u20D2","nsubseteq":"\u2288","nsubseteqq":"\u2AC5\u0338","nsucc":"\u2281","nsucceq":"\u2AB0\u0338","nsup":"\u2285","nsupE":"\u2AC6\u0338","nsupe":"\u2289","nsupset":"\u2283\u20D2","nsupseteq":"\u2289","nsupseteqq":"\u2AC6\u0338","ntgl":"\u2279","Ntilde":"\u00D1","ntilde":"\u00F1","ntlg":"\u2278","ntriangleleft":"\u22EA","ntrianglelefteq":"\u22EC","ntriangleright":"\u22EB","ntrianglerighteq":"\u22ED","Nu":"\u039D","nu":"\u03BD","num":"#","numero":"\u2116","numsp":"\u2007","nvap":"\u224D\u20D2","nvdash":"\u22AC","nvDash":"\u22AD","nVdash":"\u22AE","nVDash":"\u22AF","nvge":"\u2265\u20D2","nvgt":">\u20D2","nvHarr":"\u2904","nvinfin":"\u29DE","nvlArr":"\u2902","nvle":"\u2264\u20D2","nvlt":"<\u20D2","nvltrie":"\u22B4\u20D2","nvrArr":"\u2903","nvrtrie":"\u22B5\u20D2","nvsim":"\u223C\u20D2","nwarhk":"\u2923","nwarr":"\u2196","nwArr":"\u21D6","nwarrow":"\u2196","nwnear":"\u2927","Oacute":"\u00D3","oacute":"\u00F3","oast":"\u229B","Ocirc":"\u00D4","ocirc":"\u00F4","ocir":"\u229A","Ocy":"\u041E","ocy":"\u043E","odash":"\u229D","Odblac":"\u0150","odblac":"\u0151","odiv":"\u2A38","odot":"\u2299","odsold":"\u29BC","OElig":"\u0152","oelig":"\u0153","ofcir":"\u29BF","Ofr":"\uD835\uDD12","ofr":"\uD835\uDD2C","ogon":"\u02DB","Ograve":"\u00D2","ograve":"\u00F2","ogt":"\u29C1","ohbar":"\u29B5","ohm":"\u03A9","oint":"\u222E","olarr":"\u21BA","olcir":"\u29BE","olcross":"\u29BB","oline":"\u203E","olt":"\u29C0","Omacr":"\u014C","omacr":"\u014D","Omega":"\u03A9","omega":"\u03C9","Omicron":"\u039F","omicron":"\u03BF","omid":"\u29B6","ominus":"\u2296","Oopf":"\uD835\uDD46","oopf":"\uD835\uDD60","opar":"\u29B7","OpenCurlyDoubleQuote":"\u201C","OpenCurlyQuote":"\u2018","operp":"\u29B9","oplus":"\u2295","orarr":"\u21BB","Or":"\u2A54","or":"\u2228","ord":"\u2A5D","order":"\u2134","orderof":"\u2134","ordf":"\u00AA","ordm":"\u00BA","origof":"\u22B6","oror":"\u2A56","orslope":"\u2A57","orv":"\u2A5B","oS":"\u24C8","Oscr":"\uD835\uDCAA","oscr":"\u2134","Oslash":"\u00D8","oslash":"\u00F8","osol":"\u2298","Otilde":"\u00D5","otilde":"\u00F5","otimesas":"\u2A36","Otimes":"\u2A37","otimes":"\u2297","Ouml":"\u00D6","ouml":"\u00F6","ovbar":"\u233D","OverBar":"\u203E","OverBrace":"\u23DE","OverBracket":"\u23B4","OverParenthesis":"\u23DC","para":"\u00B6","parallel":"\u2225","par":"\u2225","parsim":"\u2AF3","parsl":"\u2AFD","part":"\u2202","PartialD":"\u2202","Pcy":"\u041F","pcy":"\u043F","percnt":"%","period":".","permil":"\u2030","perp":"\u22A5","pertenk":"\u2031","Pfr":"\uD835\uDD13","pfr":"\uD835\uDD2D","Phi":"\u03A6","phi":"\u03C6","phiv":"\u03D5","phmmat":"\u2133","phone":"\u260E","Pi":"\u03A0","pi":"\u03C0","pitchfork":"\u22D4","piv":"\u03D6","planck":"\u210F","planckh":"\u210E","plankv":"\u210F","plusacir":"\u2A23","plusb":"\u229E","pluscir":"\u2A22","plus":"+","plusdo":"\u2214","plusdu":"\u2A25","pluse":"\u2A72","PlusMinus":"\u00B1","plusmn":"\u00B1","plussim":"\u2A26","plustwo":"\u2A27","pm":"\u00B1","Poincareplane":"\u210C","pointint":"\u2A15","popf":"\uD835\uDD61","Popf":"\u2119","pound":"\u00A3","prap":"\u2AB7","Pr":"\u2ABB","pr":"\u227A","prcue":"\u227C","precapprox":"\u2AB7","prec":"\u227A","preccurlyeq":"\u227C","Precedes":"\u227A","PrecedesEqual":"\u2AAF","PrecedesSlantEqual":"\u227C","PrecedesTilde":"\u227E","preceq":"\u2AAF","precnapprox":"\u2AB9","precneqq":"\u2AB5","precnsim":"\u22E8","pre":"\u2AAF","prE":"\u2AB3","precsim":"\u227E","prime":"\u2032","Prime":"\u2033","primes":"\u2119","prnap":"\u2AB9","prnE":"\u2AB5","prnsim":"\u22E8","prod":"\u220F","Product":"\u220F","profalar":"\u232E","profline":"\u2312","profsurf":"\u2313","prop":"\u221D","Proportional":"\u221D","Proportion":"\u2237","propto":"\u221D","prsim":"\u227E","prurel":"\u22B0","Pscr":"\uD835\uDCAB","pscr":"\uD835\uDCC5","Psi":"\u03A8","psi":"\u03C8","puncsp":"\u2008","Qfr":"\uD835\uDD14","qfr":"\uD835\uDD2E","qint":"\u2A0C","qopf":"\uD835\uDD62","Qopf":"\u211A","qprime":"\u2057","Qscr":"\uD835\uDCAC","qscr":"\uD835\uDCC6","quaternions":"\u210D","quatint":"\u2A16","quest":"?","questeq":"\u225F","quot":"\"","QUOT":"\"","rAarr":"\u21DB","race":"\u223D\u0331","Racute":"\u0154","racute":"\u0155","radic":"\u221A","raemptyv":"\u29B3","rang":"\u27E9","Rang":"\u27EB","rangd":"\u2992","range":"\u29A5","rangle":"\u27E9","raquo":"\u00BB","rarrap":"\u2975","rarrb":"\u21E5","rarrbfs":"\u2920","rarrc":"\u2933","rarr":"\u2192","Rarr":"\u21A0","rArr":"\u21D2","rarrfs":"\u291E","rarrhk":"\u21AA","rarrlp":"\u21AC","rarrpl":"\u2945","rarrsim":"\u2974","Rarrtl":"\u2916","rarrtl":"\u21A3","rarrw":"\u219D","ratail":"\u291A","rAtail":"\u291C","ratio":"\u2236","rationals":"\u211A","rbarr":"\u290D","rBarr":"\u290F","RBarr":"\u2910","rbbrk":"\u2773","rbrace":"}","rbrack":"]","rbrke":"\u298C","rbrksld":"\u298E","rbrkslu":"\u2990","Rcaron":"\u0158","rcaron":"\u0159","Rcedil":"\u0156","rcedil":"\u0157","rceil":"\u2309","rcub":"}","Rcy":"\u0420","rcy":"\u0440","rdca":"\u2937","rdldhar":"\u2969","rdquo":"\u201D","rdquor":"\u201D","rdsh":"\u21B3","real":"\u211C","realine":"\u211B","realpart":"\u211C","reals":"\u211D","Re":"\u211C","rect":"\u25AD","reg":"\u00AE","REG":"\u00AE","ReverseElement":"\u220B","ReverseEquilibrium":"\u21CB","ReverseUpEquilibrium":"\u296F","rfisht":"\u297D","rfloor":"\u230B","rfr":"\uD835\uDD2F","Rfr":"\u211C","rHar":"\u2964","rhard":"\u21C1","rharu":"\u21C0","rharul":"\u296C","Rho":"\u03A1","rho":"\u03C1","rhov":"\u03F1","RightAngleBracket":"\u27E9","RightArrowBar":"\u21E5","rightarrow":"\u2192","RightArrow":"\u2192","Rightarrow":"\u21D2","RightArrowLeftArrow":"\u21C4","rightarrowtail":"\u21A3","RightCeiling":"\u2309","RightDoubleBracket":"\u27E7","RightDownTeeVector":"\u295D","RightDownVectorBar":"\u2955","RightDownVector":"\u21C2","RightFloor":"\u230B","rightharpoondown":"\u21C1","rightharpoonup":"\u21C0","rightleftarrows":"\u21C4","rightleftharpoons":"\u21CC","rightrightarrows":"\u21C9","rightsquigarrow":"\u219D","RightTeeArrow":"\u21A6","RightTee":"\u22A2","RightTeeVector":"\u295B","rightthreetimes":"\u22CC","RightTriangleBar":"\u29D0","RightTriangle":"\u22B3","RightTriangleEqual":"\u22B5","RightUpDownVector":"\u294F","RightUpTeeVector":"\u295C","RightUpVectorBar":"\u2954","RightUpVector":"\u21BE","RightVectorBar":"\u2953","RightVector":"\u21C0","ring":"\u02DA","risingdotseq":"\u2253","rlarr":"\u21C4","rlhar":"\u21CC","rlm":"\u200F","rmoustache":"\u23B1","rmoust":"\u23B1","rnmid":"\u2AEE","roang":"\u27ED","roarr":"\u21FE","robrk":"\u27E7","ropar":"\u2986","ropf":"\uD835\uDD63","Ropf":"\u211D","roplus":"\u2A2E","rotimes":"\u2A35","RoundImplies":"\u2970","rpar":")","rpargt":"\u2994","rppolint":"\u2A12","rrarr":"\u21C9","Rrightarrow":"\u21DB","rsaquo":"\u203A","rscr":"\uD835\uDCC7","Rscr":"\u211B","rsh":"\u21B1","Rsh":"\u21B1","rsqb":"]","rsquo":"\u2019","rsquor":"\u2019","rthree":"\u22CC","rtimes":"\u22CA","rtri":"\u25B9","rtrie":"\u22B5","rtrif":"\u25B8","rtriltri":"\u29CE","RuleDelayed":"\u29F4","ruluhar":"\u2968","rx":"\u211E","Sacute":"\u015A","sacute":"\u015B","sbquo":"\u201A","scap":"\u2AB8","Scaron":"\u0160","scaron":"\u0161","Sc":"\u2ABC","sc":"\u227B","sccue":"\u227D","sce":"\u2AB0","scE":"\u2AB4","Scedil":"\u015E","scedil":"\u015F","Scirc":"\u015C","scirc":"\u015D","scnap":"\u2ABA","scnE":"\u2AB6","scnsim":"\u22E9","scpolint":"\u2A13","scsim":"\u227F","Scy":"\u0421","scy":"\u0441","sdotb":"\u22A1","sdot":"\u22C5","sdote":"\u2A66","searhk":"\u2925","searr":"\u2198","seArr":"\u21D8","searrow":"\u2198","sect":"\u00A7","semi":";","seswar":"\u2929","setminus":"\u2216","setmn":"\u2216","sext":"\u2736","Sfr":"\uD835\uDD16","sfr":"\uD835\uDD30","sfrown":"\u2322","sharp":"\u266F","SHCHcy":"\u0429","shchcy":"\u0449","SHcy":"\u0428","shcy":"\u0448","ShortDownArrow":"\u2193","ShortLeftArrow":"\u2190","shortmid":"\u2223","shortparallel":"\u2225","ShortRightArrow":"\u2192","ShortUpArrow":"\u2191","shy":"\u00AD","Sigma":"\u03A3","sigma":"\u03C3","sigmaf":"\u03C2","sigmav":"\u03C2","sim":"\u223C","simdot":"\u2A6A","sime":"\u2243","simeq":"\u2243","simg":"\u2A9E","simgE":"\u2AA0","siml":"\u2A9D","simlE":"\u2A9F","simne":"\u2246","simplus":"\u2A24","simrarr":"\u2972","slarr":"\u2190","SmallCircle":"\u2218","smallsetminus":"\u2216","smashp":"\u2A33","smeparsl":"\u29E4","smid":"\u2223","smile":"\u2323","smt":"\u2AAA","smte":"\u2AAC","smtes":"\u2AAC\uFE00","SOFTcy":"\u042C","softcy":"\u044C","solbar":"\u233F","solb":"\u29C4","sol":"/","Sopf":"\uD835\uDD4A","sopf":"\uD835\uDD64","spades":"\u2660","spadesuit":"\u2660","spar":"\u2225","sqcap":"\u2293","sqcaps":"\u2293\uFE00","sqcup":"\u2294","sqcups":"\u2294\uFE00","Sqrt":"\u221A","sqsub":"\u228F","sqsube":"\u2291","sqsubset":"\u228F","sqsubseteq":"\u2291","sqsup":"\u2290","sqsupe":"\u2292","sqsupset":"\u2290","sqsupseteq":"\u2292","square":"\u25A1","Square":"\u25A1","SquareIntersection":"\u2293","SquareSubset":"\u228F","SquareSubsetEqual":"\u2291","SquareSuperset":"\u2290","SquareSupersetEqual":"\u2292","SquareUnion":"\u2294","squarf":"\u25AA","squ":"\u25A1","squf":"\u25AA","srarr":"\u2192","Sscr":"\uD835\uDCAE","sscr":"\uD835\uDCC8","ssetmn":"\u2216","ssmile":"\u2323","sstarf":"\u22C6","Star":"\u22C6","star":"\u2606","starf":"\u2605","straightepsilon":"\u03F5","straightphi":"\u03D5","strns":"\u00AF","sub":"\u2282","Sub":"\u22D0","subdot":"\u2ABD","subE":"\u2AC5","sube":"\u2286","subedot":"\u2AC3","submult":"\u2AC1","subnE":"\u2ACB","subne":"\u228A","subplus":"\u2ABF","subrarr":"\u2979","subset":"\u2282","Subset":"\u22D0","subseteq":"\u2286","subseteqq":"\u2AC5","SubsetEqual":"\u2286","subsetneq":"\u228A","subsetneqq":"\u2ACB","subsim":"\u2AC7","subsub":"\u2AD5","subsup":"\u2AD3","succapprox":"\u2AB8","succ":"\u227B","succcurlyeq":"\u227D","Succeeds":"\u227B","SucceedsEqual":"\u2AB0","SucceedsSlantEqual":"\u227D","SucceedsTilde":"\u227F","succeq":"\u2AB0","succnapprox":"\u2ABA","succneqq":"\u2AB6","succnsim":"\u22E9","succsim":"\u227F","SuchThat":"\u220B","sum":"\u2211","Sum":"\u2211","sung":"\u266A","sup1":"\u00B9","sup2":"\u00B2","sup3":"\u00B3","sup":"\u2283","Sup":"\u22D1","supdot":"\u2ABE","supdsub":"\u2AD8","supE":"\u2AC6","supe":"\u2287","supedot":"\u2AC4","Superset":"\u2283","SupersetEqual":"\u2287","suphsol":"\u27C9","suphsub":"\u2AD7","suplarr":"\u297B","supmult":"\u2AC2","supnE":"\u2ACC","supne":"\u228B","supplus":"\u2AC0","supset":"\u2283","Supset":"\u22D1","supseteq":"\u2287","supseteqq":"\u2AC6","supsetneq":"\u228B","supsetneqq":"\u2ACC","supsim":"\u2AC8","supsub":"\u2AD4","supsup":"\u2AD6","swarhk":"\u2926","swarr":"\u2199","swArr":"\u21D9","swarrow":"\u2199","swnwar":"\u292A","szlig":"\u00DF","Tab":"\t","target":"\u2316","Tau":"\u03A4","tau":"\u03C4","tbrk":"\u23B4","Tcaron":"\u0164","tcaron":"\u0165","Tcedil":"\u0162","tcedil":"\u0163","Tcy":"\u0422","tcy":"\u0442","tdot":"\u20DB","telrec":"\u2315","Tfr":"\uD835\uDD17","tfr":"\uD835\uDD31","there4":"\u2234","therefore":"\u2234","Therefore":"\u2234","Theta":"\u0398","theta":"\u03B8","thetasym":"\u03D1","thetav":"\u03D1","thickapprox":"\u2248","thicksim":"\u223C","ThickSpace":"\u205F\u200A","ThinSpace":"\u2009","thinsp":"\u2009","thkap":"\u2248","thksim":"\u223C","THORN":"\u00DE","thorn":"\u00FE","tilde":"\u02DC","Tilde":"\u223C","TildeEqual":"\u2243","TildeFullEqual":"\u2245","TildeTilde":"\u2248","timesbar":"\u2A31","timesb":"\u22A0","times":"\u00D7","timesd":"\u2A30","tint":"\u222D","toea":"\u2928","topbot":"\u2336","topcir":"\u2AF1","top":"\u22A4","Topf":"\uD835\uDD4B","topf":"\uD835\uDD65","topfork":"\u2ADA","tosa":"\u2929","tprime":"\u2034","trade":"\u2122","TRADE":"\u2122","triangle":"\u25B5","triangledown":"\u25BF","triangleleft":"\u25C3","trianglelefteq":"\u22B4","triangleq":"\u225C","triangleright":"\u25B9","trianglerighteq":"\u22B5","tridot":"\u25EC","trie":"\u225C","triminus":"\u2A3A","TripleDot":"\u20DB","triplus":"\u2A39","trisb":"\u29CD","tritime":"\u2A3B","trpezium":"\u23E2","Tscr":"\uD835\uDCAF","tscr":"\uD835\uDCC9","TScy":"\u0426","tscy":"\u0446","TSHcy":"\u040B","tshcy":"\u045B","Tstrok":"\u0166","tstrok":"\u0167","twixt":"\u226C","twoheadleftarrow":"\u219E","twoheadrightarrow":"\u21A0","Uacute":"\u00DA","uacute":"\u00FA","uarr":"\u2191","Uarr":"\u219F","uArr":"\u21D1","Uarrocir":"\u2949","Ubrcy":"\u040E","ubrcy":"\u045E","Ubreve":"\u016C","ubreve":"\u016D","Ucirc":"\u00DB","ucirc":"\u00FB","Ucy":"\u0423","ucy":"\u0443","udarr":"\u21C5","Udblac":"\u0170","udblac":"\u0171","udhar":"\u296E","ufisht":"\u297E","Ufr":"\uD835\uDD18","ufr":"\uD835\uDD32","Ugrave":"\u00D9","ugrave":"\u00F9","uHar":"\u2963","uharl":"\u21BF","uharr":"\u21BE","uhblk":"\u2580","ulcorn":"\u231C","ulcorner":"\u231C","ulcrop":"\u230F","ultri":"\u25F8","Umacr":"\u016A","umacr":"\u016B","uml":"\u00A8","UnderBar":"_","UnderBrace":"\u23DF","UnderBracket":"\u23B5","UnderParenthesis":"\u23DD","Union":"\u22C3","UnionPlus":"\u228E","Uogon":"\u0172","uogon":"\u0173","Uopf":"\uD835\uDD4C","uopf":"\uD835\uDD66","UpArrowBar":"\u2912","uparrow":"\u2191","UpArrow":"\u2191","Uparrow":"\u21D1","UpArrowDownArrow":"\u21C5","updownarrow":"\u2195","UpDownArrow":"\u2195","Updownarrow":"\u21D5","UpEquilibrium":"\u296E","upharpoonleft":"\u21BF","upharpoonright":"\u21BE","uplus":"\u228E","UpperLeftArrow":"\u2196","UpperRightArrow":"\u2197","upsi":"\u03C5","Upsi":"\u03D2","upsih":"\u03D2","Upsilon":"\u03A5","upsilon":"\u03C5","UpTeeArrow":"\u21A5","UpTee":"\u22A5","upuparrows":"\u21C8","urcorn":"\u231D","urcorner":"\u231D","urcrop":"\u230E","Uring":"\u016E","uring":"\u016F","urtri":"\u25F9","Uscr":"\uD835\uDCB0","uscr":"\uD835\uDCCA","utdot":"\u22F0","Utilde":"\u0168","utilde":"\u0169","utri":"\u25B5","utrif":"\u25B4","uuarr":"\u21C8","Uuml":"\u00DC","uuml":"\u00FC","uwangle":"\u29A7","vangrt":"\u299C","varepsilon":"\u03F5","varkappa":"\u03F0","varnothing":"\u2205","varphi":"\u03D5","varpi":"\u03D6","varpropto":"\u221D","varr":"\u2195","vArr":"\u21D5","varrho":"\u03F1","varsigma":"\u03C2","varsubsetneq":"\u228A\uFE00","varsubsetneqq":"\u2ACB\uFE00","varsupsetneq":"\u228B\uFE00","varsupsetneqq":"\u2ACC\uFE00","vartheta":"\u03D1","vartriangleleft":"\u22B2","vartriangleright":"\u22B3","vBar":"\u2AE8","Vbar":"\u2AEB","vBarv":"\u2AE9","Vcy":"\u0412","vcy":"\u0432","vdash":"\u22A2","vDash":"\u22A8","Vdash":"\u22A9","VDash":"\u22AB","Vdashl":"\u2AE6","veebar":"\u22BB","vee":"\u2228","Vee":"\u22C1","veeeq":"\u225A","vellip":"\u22EE","verbar":"|","Verbar":"\u2016","vert":"|","Vert":"\u2016","VerticalBar":"\u2223","VerticalLine":"|","VerticalSeparator":"\u2758","VerticalTilde":"\u2240","VeryThinSpace":"\u200A","Vfr":"\uD835\uDD19","vfr":"\uD835\uDD33","vltri":"\u22B2","vnsub":"\u2282\u20D2","vnsup":"\u2283\u20D2","Vopf":"\uD835\uDD4D","vopf":"\uD835\uDD67","vprop":"\u221D","vrtri":"\u22B3","Vscr":"\uD835\uDCB1","vscr":"\uD835\uDCCB","vsubnE":"\u2ACB\uFE00","vsubne":"\u228A\uFE00","vsupnE":"\u2ACC\uFE00","vsupne":"\u228B\uFE00","Vvdash":"\u22AA","vzigzag":"\u299A","Wcirc":"\u0174","wcirc":"\u0175","wedbar":"\u2A5F","wedge":"\u2227","Wedge":"\u22C0","wedgeq":"\u2259","weierp":"\u2118","Wfr":"\uD835\uDD1A","wfr":"\uD835\uDD34","Wopf":"\uD835\uDD4E","wopf":"\uD835\uDD68","wp":"\u2118","wr":"\u2240","wreath":"\u2240","Wscr":"\uD835\uDCB2","wscr":"\uD835\uDCCC","xcap":"\u22C2","xcirc":"\u25EF","xcup":"\u22C3","xdtri":"\u25BD","Xfr":"\uD835\uDD1B","xfr":"\uD835\uDD35","xharr":"\u27F7","xhArr":"\u27FA","Xi":"\u039E","xi":"\u03BE","xlarr":"\u27F5","xlArr":"\u27F8","xmap":"\u27FC","xnis":"\u22FB","xodot":"\u2A00","Xopf":"\uD835\uDD4F","xopf":"\uD835\uDD69","xoplus":"\u2A01","xotime":"\u2A02","xrarr":"\u27F6","xrArr":"\u27F9","Xscr":"\uD835\uDCB3","xscr":"\uD835\uDCCD","xsqcup":"\u2A06","xuplus":"\u2A04","xutri":"\u25B3","xvee":"\u22C1","xwedge":"\u22C0","Yacute":"\u00DD","yacute":"\u00FD","YAcy":"\u042F","yacy":"\u044F","Ycirc":"\u0176","ycirc":"\u0177","Ycy":"\u042B","ycy":"\u044B","yen":"\u00A5","Yfr":"\uD835\uDD1C","yfr":"\uD835\uDD36","YIcy":"\u0407","yicy":"\u0457","Yopf":"\uD835\uDD50","yopf":"\uD835\uDD6A","Yscr":"\uD835\uDCB4","yscr":"\uD835\uDCCE","YUcy":"\u042E","yucy":"\u044E","yuml":"\u00FF","Yuml":"\u0178","Zacute":"\u0179","zacute":"\u017A","Zcaron":"\u017D","zcaron":"\u017E","Zcy":"\u0417","zcy":"\u0437","Zdot":"\u017B","zdot":"\u017C","zeetrf":"\u2128","ZeroWidthSpace":"\u200B","Zeta":"\u0396","zeta":"\u03B6","zfr":"\uD835\uDD37","Zfr":"\u2128","ZHcy":"\u0416","zhcy":"\u0436","zigrarr":"\u21DD","zopf":"\uD835\uDD6B","Zopf":"\u2124","Zscr":"\uD835\uDCB5","zscr":"\uD835\uDCCF","zwj":"\u200D","zwnj":"\u200C"}
 },{}],33:[function(require,module,exports){
-module.exports={"Aacute":"\u00C1","aacute":"\u00E1","Acirc":"\u00C2","acirc":"\u00E2","acute":"\u00B4","AElig":"\u00C6","aelig":"\u00E6","Agrave":"\u00C0","agrave":"\u00E0","amp":"&","AMP":"&","Aring":"\u00C5","aring":"\u00E5","Atilde":"\u00C3","atilde":"\u00E3","Auml":"\u00C4","auml":"\u00E4","brvbar":"\u00A6","Ccedil":"\u00C7","ccedil":"\u00E7","cedil":"\u00B8","cent":"\u00A2","copy":"\u00A9","COPY":"\u00A9","curren":"\u00A4","deg":"\u00B0","divide":"\u00F7","Eacute":"\u00C9","eacute":"\u00E9","Ecirc":"\u00CA","ecirc":"\u00EA","Egrave":"\u00C8","egrave":"\u00E8","ETH":"\u00D0","eth":"\u00F0","Euml":"\u00CB","euml":"\u00EB","frac12":"\u00BD","frac14":"\u00BC","frac34":"\u00BE","gt":">","GT":">","Iacute":"\u00CD","iacute":"\u00ED","Icirc":"\u00CE","icirc":"\u00EE","iexcl":"\u00A1","Igrave":"\u00CC","igrave":"\u00EC","iquest":"\u00BF","Iuml":"\u00CF","iuml":"\u00EF","laquo":"\u00AB","lt":"<","LT":"<","macr":"\u00AF","micro":"\u00B5","middot":"\u00B7","nbsp":"\u00A0","not":"\u00AC","Ntilde":"\u00D1","ntilde":"\u00F1","Oacute":"\u00D3","oacute":"\u00F3","Ocirc":"\u00D4","ocirc":"\u00F4","Ograve":"\u00D2","ograve":"\u00F2","ordf":"\u00AA","ordm":"\u00BA","Oslash":"\u00D8","oslash":"\u00F8","Otilde":"\u00D5","otilde":"\u00F5","Ouml":"\u00D6","ouml":"\u00F6","para":"\u00B6","plusmn":"\u00B1","pound":"\u00A3","quot":"\"","QUOT":"\"","raquo":"\u00BB","reg":"\u00AE","REG":"\u00AE","sect":"\u00A7","shy":"\u00AD","sup1":"\u00B9","sup2":"\u00B2","sup3":"\u00B3","szlig":"\u00DF","THORN":"\u00DE","thorn":"\u00FE","times":"\u00D7","Uacute":"\u00DA","uacute":"\u00FA","Ucirc":"\u00DB","ucirc":"\u00FB","Ugrave":"\u00D9","ugrave":"\u00F9","uml":"\u00A8","Uuml":"\u00DC","uuml":"\u00FC","Yacute":"\u00DD","yacute":"\u00FD","yen":"\u00A5","yuml":"\u00FF"}
+module.exports={"Aacute":"\u00C1","aacute":"\u00E1","Abreve":"\u0102","abreve":"\u0103","ac":"\u223E","acd":"\u223F","acE":"\u223E\u0333","Acirc":"\u00C2","acirc":"\u00E2","acute":"\u00B4","Acy":"\u0410","acy":"\u0430","AElig":"\u00C6","aelig":"\u00E6","af":"\u2061","Afr":"\uD835\uDD04","afr":"\uD835\uDD1E","Agrave":"\u00C0","agrave":"\u00E0","alefsym":"\u2135","aleph":"\u2135","Alpha":"\u0391","alpha":"\u03B1","Amacr":"\u0100","amacr":"\u0101","amalg":"\u2A3F","amp":"&","AMP":"&","andand":"\u2A55","And":"\u2A53","and":"\u2227","andd":"\u2A5C","andslope":"\u2A58","andv":"\u2A5A","ang":"\u2220","ange":"\u29A4","angle":"\u2220","angmsdaa":"\u29A8","angmsdab":"\u29A9","angmsdac":"\u29AA","angmsdad":"\u29AB","angmsdae":"\u29AC","angmsdaf":"\u29AD","angmsdag":"\u29AE","angmsdah":"\u29AF","angmsd":"\u2221","angrt":"\u221F","angrtvb":"\u22BE","angrtvbd":"\u299D","angsph":"\u2222","angst":"\u00C5","angzarr":"\u237C","Aogon":"\u0104","aogon":"\u0105","Aopf":"\uD835\uDD38","aopf":"\uD835\uDD52","apacir":"\u2A6F","ap":"\u2248","apE":"\u2A70","ape":"\u224A","apid":"\u224B","apos":"'","ApplyFunction":"\u2061","approx":"\u2248","approxeq":"\u224A","Aring":"\u00C5","aring":"\u00E5","Ascr":"\uD835\uDC9C","ascr":"\uD835\uDCB6","Assign":"\u2254","ast":"*","asymp":"\u2248","asympeq":"\u224D","Atilde":"\u00C3","atilde":"\u00E3","Auml":"\u00C4","auml":"\u00E4","awconint":"\u2233","awint":"\u2A11","backcong":"\u224C","backepsilon":"\u03F6","backprime":"\u2035","backsim":"\u223D","backsimeq":"\u22CD","Backslash":"\u2216","Barv":"\u2AE7","barvee":"\u22BD","barwed":"\u2305","Barwed":"\u2306","barwedge":"\u2305","bbrk":"\u23B5","bbrktbrk":"\u23B6","bcong":"\u224C","Bcy":"\u0411","bcy":"\u0431","bdquo":"\u201E","becaus":"\u2235","because":"\u2235","Because":"\u2235","bemptyv":"\u29B0","bepsi":"\u03F6","bernou":"\u212C","Bernoullis":"\u212C","Beta":"\u0392","beta":"\u03B2","beth":"\u2136","between":"\u226C","Bfr":"\uD835\uDD05","bfr":"\uD835\uDD1F","bigcap":"\u22C2","bigcirc":"\u25EF","bigcup":"\u22C3","bigodot":"\u2A00","bigoplus":"\u2A01","bigotimes":"\u2A02","bigsqcup":"\u2A06","bigstar":"\u2605","bigtriangledown":"\u25BD","bigtriangleup":"\u25B3","biguplus":"\u2A04","bigvee":"\u22C1","bigwedge":"\u22C0","bkarow":"\u290D","blacklozenge":"\u29EB","blacksquare":"\u25AA","blacktriangle":"\u25B4","blacktriangledown":"\u25BE","blacktriangleleft":"\u25C2","blacktriangleright":"\u25B8","blank":"\u2423","blk12":"\u2592","blk14":"\u2591","blk34":"\u2593","block":"\u2588","bne":"=\u20E5","bnequiv":"\u2261\u20E5","bNot":"\u2AED","bnot":"\u2310","Bopf":"\uD835\uDD39","bopf":"\uD835\uDD53","bot":"\u22A5","bottom":"\u22A5","bowtie":"\u22C8","boxbox":"\u29C9","boxdl":"\u2510","boxdL":"\u2555","boxDl":"\u2556","boxDL":"\u2557","boxdr":"\u250C","boxdR":"\u2552","boxDr":"\u2553","boxDR":"\u2554","boxh":"\u2500","boxH":"\u2550","boxhd":"\u252C","boxHd":"\u2564","boxhD":"\u2565","boxHD":"\u2566","boxhu":"\u2534","boxHu":"\u2567","boxhU":"\u2568","boxHU":"\u2569","boxminus":"\u229F","boxplus":"\u229E","boxtimes":"\u22A0","boxul":"\u2518","boxuL":"\u255B","boxUl":"\u255C","boxUL":"\u255D","boxur":"\u2514","boxuR":"\u2558","boxUr":"\u2559","boxUR":"\u255A","boxv":"\u2502","boxV":"\u2551","boxvh":"\u253C","boxvH":"\u256A","boxVh":"\u256B","boxVH":"\u256C","boxvl":"\u2524","boxvL":"\u2561","boxVl":"\u2562","boxVL":"\u2563","boxvr":"\u251C","boxvR":"\u255E","boxVr":"\u255F","boxVR":"\u2560","bprime":"\u2035","breve":"\u02D8","Breve":"\u02D8","brvbar":"\u00A6","bscr":"\uD835\uDCB7","Bscr":"\u212C","bsemi":"\u204F","bsim":"\u223D","bsime":"\u22CD","bsolb":"\u29C5","bsol":"\\","bsolhsub":"\u27C8","bull":"\u2022","bullet":"\u2022","bump":"\u224E","bumpE":"\u2AAE","bumpe":"\u224F","Bumpeq":"\u224E","bumpeq":"\u224F","Cacute":"\u0106","cacute":"\u0107","capand":"\u2A44","capbrcup":"\u2A49","capcap":"\u2A4B","cap":"\u2229","Cap":"\u22D2","capcup":"\u2A47","capdot":"\u2A40","CapitalDifferentialD":"\u2145","caps":"\u2229\uFE00","caret":"\u2041","caron":"\u02C7","Cayleys":"\u212D","ccaps":"\u2A4D","Ccaron":"\u010C","ccaron":"\u010D","Ccedil":"\u00C7","ccedil":"\u00E7","Ccirc":"\u0108","ccirc":"\u0109","Cconint":"\u2230","ccups":"\u2A4C","ccupssm":"\u2A50","Cdot":"\u010A","cdot":"\u010B","cedil":"\u00B8","Cedilla":"\u00B8","cemptyv":"\u29B2","cent":"\u00A2","centerdot":"\u00B7","CenterDot":"\u00B7","cfr":"\uD835\uDD20","Cfr":"\u212D","CHcy":"\u0427","chcy":"\u0447","check":"\u2713","checkmark":"\u2713","Chi":"\u03A7","chi":"\u03C7","circ":"\u02C6","circeq":"\u2257","circlearrowleft":"\u21BA","circlearrowright":"\u21BB","circledast":"\u229B","circledcirc":"\u229A","circleddash":"\u229D","CircleDot":"\u2299","circledR":"\u00AE","circledS":"\u24C8","CircleMinus":"\u2296","CirclePlus":"\u2295","CircleTimes":"\u2297","cir":"\u25CB","cirE":"\u29C3","cire":"\u2257","cirfnint":"\u2A10","cirmid":"\u2AEF","cirscir":"\u29C2","ClockwiseContourIntegral":"\u2232","CloseCurlyDoubleQuote":"\u201D","CloseCurlyQuote":"\u2019","clubs":"\u2663","clubsuit":"\u2663","colon":":","Colon":"\u2237","Colone":"\u2A74","colone":"\u2254","coloneq":"\u2254","comma":",","commat":"@","comp":"\u2201","compfn":"\u2218","complement":"\u2201","complexes":"\u2102","cong":"\u2245","congdot":"\u2A6D","Congruent":"\u2261","conint":"\u222E","Conint":"\u222F","ContourIntegral":"\u222E","copf":"\uD835\uDD54","Copf":"\u2102","coprod":"\u2210","Coproduct":"\u2210","copy":"\u00A9","COPY":"\u00A9","copysr":"\u2117","CounterClockwiseContourIntegral":"\u2233","crarr":"\u21B5","cross":"\u2717","Cross":"\u2A2F","Cscr":"\uD835\uDC9E","cscr":"\uD835\uDCB8","csub":"\u2ACF","csube":"\u2AD1","csup":"\u2AD0","csupe":"\u2AD2","ctdot":"\u22EF","cudarrl":"\u2938","cudarrr":"\u2935","cuepr":"\u22DE","cuesc":"\u22DF","cularr":"\u21B6","cularrp":"\u293D","cupbrcap":"\u2A48","cupcap":"\u2A46","CupCap":"\u224D","cup":"\u222A","Cup":"\u22D3","cupcup":"\u2A4A","cupdot":"\u228D","cupor":"\u2A45","cups":"\u222A\uFE00","curarr":"\u21B7","curarrm":"\u293C","curlyeqprec":"\u22DE","curlyeqsucc":"\u22DF","curlyvee":"\u22CE","curlywedge":"\u22CF","curren":"\u00A4","curvearrowleft":"\u21B6","curvearrowright":"\u21B7","cuvee":"\u22CE","cuwed":"\u22CF","cwconint":"\u2232","cwint":"\u2231","cylcty":"\u232D","dagger":"\u2020","Dagger":"\u2021","daleth":"\u2138","darr":"\u2193","Darr":"\u21A1","dArr":"\u21D3","dash":"\u2010","Dashv":"\u2AE4","dashv":"\u22A3","dbkarow":"\u290F","dblac":"\u02DD","Dcaron":"\u010E","dcaron":"\u010F","Dcy":"\u0414","dcy":"\u0434","ddagger":"\u2021","ddarr":"\u21CA","DD":"\u2145","dd":"\u2146","DDotrahd":"\u2911","ddotseq":"\u2A77","deg":"\u00B0","Del":"\u2207","Delta":"\u0394","delta":"\u03B4","demptyv":"\u29B1","dfisht":"\u297F","Dfr":"\uD835\uDD07","dfr":"\uD835\uDD21","dHar":"\u2965","dharl":"\u21C3","dharr":"\u21C2","DiacriticalAcute":"\u00B4","DiacriticalDot":"\u02D9","DiacriticalDoubleAcute":"\u02DD","DiacriticalGrave":"`","DiacriticalTilde":"\u02DC","diam":"\u22C4","diamond":"\u22C4","Diamond":"\u22C4","diamondsuit":"\u2666","diams":"\u2666","die":"\u00A8","DifferentialD":"\u2146","digamma":"\u03DD","disin":"\u22F2","div":"\u00F7","divide":"\u00F7","divideontimes":"\u22C7","divonx":"\u22C7","DJcy":"\u0402","djcy":"\u0452","dlcorn":"\u231E","dlcrop":"\u230D","dollar":"$","Dopf":"\uD835\uDD3B","dopf":"\uD835\uDD55","Dot":"\u00A8","dot":"\u02D9","DotDot":"\u20DC","doteq":"\u2250","doteqdot":"\u2251","DotEqual":"\u2250","dotminus":"\u2238","dotplus":"\u2214","dotsquare":"\u22A1","doublebarwedge":"\u2306","DoubleContourIntegral":"\u222F","DoubleDot":"\u00A8","DoubleDownArrow":"\u21D3","DoubleLeftArrow":"\u21D0","DoubleLeftRightArrow":"\u21D4","DoubleLeftTee":"\u2AE4","DoubleLongLeftArrow":"\u27F8","DoubleLongLeftRightArrow":"\u27FA","DoubleLongRightArrow":"\u27F9","DoubleRightArrow":"\u21D2","DoubleRightTee":"\u22A8","DoubleUpArrow":"\u21D1","DoubleUpDownArrow":"\u21D5","DoubleVerticalBar":"\u2225","DownArrowBar":"\u2913","downarrow":"\u2193","DownArrow":"\u2193","Downarrow":"\u21D3","DownArrowUpArrow":"\u21F5","DownBreve":"\u0311","downdownarrows":"\u21CA","downharpoonleft":"\u21C3","downharpoonright":"\u21C2","DownLeftRightVector":"\u2950","DownLeftTeeVector":"\u295E","DownLeftVectorBar":"\u2956","DownLeftVector":"\u21BD","DownRightTeeVector":"\u295F","DownRightVectorBar":"\u2957","DownRightVector":"\u21C1","DownTeeArrow":"\u21A7","DownTee":"\u22A4","drbkarow":"\u2910","drcorn":"\u231F","drcrop":"\u230C","Dscr":"\uD835\uDC9F","dscr":"\uD835\uDCB9","DScy":"\u0405","dscy":"\u0455","dsol":"\u29F6","Dstrok":"\u0110","dstrok":"\u0111","dtdot":"\u22F1","dtri":"\u25BF","dtrif":"\u25BE","duarr":"\u21F5","duhar":"\u296F","dwangle":"\u29A6","DZcy":"\u040F","dzcy":"\u045F","dzigrarr":"\u27FF","Eacute":"\u00C9","eacute":"\u00E9","easter":"\u2A6E","Ecaron":"\u011A","ecaron":"\u011B","Ecirc":"\u00CA","ecirc":"\u00EA","ecir":"\u2256","ecolon":"\u2255","Ecy":"\u042D","ecy":"\u044D","eDDot":"\u2A77","Edot":"\u0116","edot":"\u0117","eDot":"\u2251","ee":"\u2147","efDot":"\u2252","Efr":"\uD835\uDD08","efr":"\uD835\uDD22","eg":"\u2A9A","Egrave":"\u00C8","egrave":"\u00E8","egs":"\u2A96","egsdot":"\u2A98","el":"\u2A99","Element":"\u2208","elinters":"\u23E7","ell":"\u2113","els":"\u2A95","elsdot":"\u2A97","Emacr":"\u0112","emacr":"\u0113","empty":"\u2205","emptyset":"\u2205","EmptySmallSquare":"\u25FB","emptyv":"\u2205","EmptyVerySmallSquare":"\u25AB","emsp13":"\u2004","emsp14":"\u2005","emsp":"\u2003","ENG":"\u014A","eng":"\u014B","ensp":"\u2002","Eogon":"\u0118","eogon":"\u0119","Eopf":"\uD835\uDD3C","eopf":"\uD835\uDD56","epar":"\u22D5","eparsl":"\u29E3","eplus":"\u2A71","epsi":"\u03B5","Epsilon":"\u0395","epsilon":"\u03B5","epsiv":"\u03F5","eqcirc":"\u2256","eqcolon":"\u2255","eqsim":"\u2242","eqslantgtr":"\u2A96","eqslantless":"\u2A95","Equal":"\u2A75","equals":"=","EqualTilde":"\u2242","equest":"\u225F","Equilibrium":"\u21CC","equiv":"\u2261","equivDD":"\u2A78","eqvparsl":"\u29E5","erarr":"\u2971","erDot":"\u2253","escr":"\u212F","Escr":"\u2130","esdot":"\u2250","Esim":"\u2A73","esim":"\u2242","Eta":"\u0397","eta":"\u03B7","ETH":"\u00D0","eth":"\u00F0","Euml":"\u00CB","euml":"\u00EB","euro":"\u20AC","excl":"!","exist":"\u2203","Exists":"\u2203","expectation":"\u2130","exponentiale":"\u2147","ExponentialE":"\u2147","fallingdotseq":"\u2252","Fcy":"\u0424","fcy":"\u0444","female":"\u2640","ffilig":"\uFB03","fflig":"\uFB00","ffllig":"\uFB04","Ffr":"\uD835\uDD09","ffr":"\uD835\uDD23","filig":"\uFB01","FilledSmallSquare":"\u25FC","FilledVerySmallSquare":"\u25AA","fjlig":"fj","flat":"\u266D","fllig":"\uFB02","fltns":"\u25B1","fnof":"\u0192","Fopf":"\uD835\uDD3D","fopf":"\uD835\uDD57","forall":"\u2200","ForAll":"\u2200","fork":"\u22D4","forkv":"\u2AD9","Fouriertrf":"\u2131","fpartint":"\u2A0D","frac12":"\u00BD","frac13":"\u2153","frac14":"\u00BC","frac15":"\u2155","frac16":"\u2159","frac18":"\u215B","frac23":"\u2154","frac25":"\u2156","frac34":"\u00BE","frac35":"\u2157","frac38":"\u215C","frac45":"\u2158","frac56":"\u215A","frac58":"\u215D","frac78":"\u215E","frasl":"\u2044","frown":"\u2322","fscr":"\uD835\uDCBB","Fscr":"\u2131","gacute":"\u01F5","Gamma":"\u0393","gamma":"\u03B3","Gammad":"\u03DC","gammad":"\u03DD","gap":"\u2A86","Gbreve":"\u011E","gbreve":"\u011F","Gcedil":"\u0122","Gcirc":"\u011C","gcirc":"\u011D","Gcy":"\u0413","gcy":"\u0433","Gdot":"\u0120","gdot":"\u0121","ge":"\u2265","gE":"\u2267","gEl":"\u2A8C","gel":"\u22DB","geq":"\u2265","geqq":"\u2267","geqslant":"\u2A7E","gescc":"\u2AA9","ges":"\u2A7E","gesdot":"\u2A80","gesdoto":"\u2A82","gesdotol":"\u2A84","gesl":"\u22DB\uFE00","gesles":"\u2A94","Gfr":"\uD835\uDD0A","gfr":"\uD835\uDD24","gg":"\u226B","Gg":"\u22D9","ggg":"\u22D9","gimel":"\u2137","GJcy":"\u0403","gjcy":"\u0453","gla":"\u2AA5","gl":"\u2277","glE":"\u2A92","glj":"\u2AA4","gnap":"\u2A8A","gnapprox":"\u2A8A","gne":"\u2A88","gnE":"\u2269","gneq":"\u2A88","gneqq":"\u2269","gnsim":"\u22E7","Gopf":"\uD835\uDD3E","gopf":"\uD835\uDD58","grave":"`","GreaterEqual":"\u2265","GreaterEqualLess":"\u22DB","GreaterFullEqual":"\u2267","GreaterGreater":"\u2AA2","GreaterLess":"\u2277","GreaterSlantEqual":"\u2A7E","GreaterTilde":"\u2273","Gscr":"\uD835\uDCA2","gscr":"\u210A","gsim":"\u2273","gsime":"\u2A8E","gsiml":"\u2A90","gtcc":"\u2AA7","gtcir":"\u2A7A","gt":">","GT":">","Gt":"\u226B","gtdot":"\u22D7","gtlPar":"\u2995","gtquest":"\u2A7C","gtrapprox":"\u2A86","gtrarr":"\u2978","gtrdot":"\u22D7","gtreqless":"\u22DB","gtreqqless":"\u2A8C","gtrless":"\u2277","gtrsim":"\u2273","gvertneqq":"\u2269\uFE00","gvnE":"\u2269\uFE00","Hacek":"\u02C7","hairsp":"\u200A","half":"\u00BD","hamilt":"\u210B","HARDcy":"\u042A","hardcy":"\u044A","harrcir":"\u2948","harr":"\u2194","hArr":"\u21D4","harrw":"\u21AD","Hat":"^","hbar":"\u210F","Hcirc":"\u0124","hcirc":"\u0125","hearts":"\u2665","heartsuit":"\u2665","hellip":"\u2026","hercon":"\u22B9","hfr":"\uD835\uDD25","Hfr":"\u210C","HilbertSpace":"\u210B","hksearow":"\u2925","hkswarow":"\u2926","hoarr":"\u21FF","homtht":"\u223B","hookleftarrow":"\u21A9","hookrightarrow":"\u21AA","hopf":"\uD835\uDD59","Hopf":"\u210D","horbar":"\u2015","HorizontalLine":"\u2500","hscr":"\uD835\uDCBD","Hscr":"\u210B","hslash":"\u210F","Hstrok":"\u0126","hstrok":"\u0127","HumpDownHump":"\u224E","HumpEqual":"\u224F","hybull":"\u2043","hyphen":"\u2010","Iacute":"\u00CD","iacute":"\u00ED","ic":"\u2063","Icirc":"\u00CE","icirc":"\u00EE","Icy":"\u0418","icy":"\u0438","Idot":"\u0130","IEcy":"\u0415","iecy":"\u0435","iexcl":"\u00A1","iff":"\u21D4","ifr":"\uD835\uDD26","Ifr":"\u2111","Igrave":"\u00CC","igrave":"\u00EC","ii":"\u2148","iiiint":"\u2A0C","iiint":"\u222D","iinfin":"\u29DC","iiota":"\u2129","IJlig":"\u0132","ijlig":"\u0133","Imacr":"\u012A","imacr":"\u012B","image":"\u2111","ImaginaryI":"\u2148","imagline":"\u2110","imagpart":"\u2111","imath":"\u0131","Im":"\u2111","imof":"\u22B7","imped":"\u01B5","Implies":"\u21D2","incare":"\u2105","in":"\u2208","infin":"\u221E","infintie":"\u29DD","inodot":"\u0131","intcal":"\u22BA","int":"\u222B","Int":"\u222C","integers":"\u2124","Integral":"\u222B","intercal":"\u22BA","Intersection":"\u22C2","intlarhk":"\u2A17","intprod":"\u2A3C","InvisibleComma":"\u2063","InvisibleTimes":"\u2062","IOcy":"\u0401","iocy":"\u0451","Iogon":"\u012E","iogon":"\u012F","Iopf":"\uD835\uDD40","iopf":"\uD835\uDD5A","Iota":"\u0399","iota":"\u03B9","iprod":"\u2A3C","iquest":"\u00BF","iscr":"\uD835\uDCBE","Iscr":"\u2110","isin":"\u2208","isindot":"\u22F5","isinE":"\u22F9","isins":"\u22F4","isinsv":"\u22F3","isinv":"\u2208","it":"\u2062","Itilde":"\u0128","itilde":"\u0129","Iukcy":"\u0406","iukcy":"\u0456","Iuml":"\u00CF","iuml":"\u00EF","Jcirc":"\u0134","jcirc":"\u0135","Jcy":"\u0419","jcy":"\u0439","Jfr":"\uD835\uDD0D","jfr":"\uD835\uDD27","jmath":"\u0237","Jopf":"\uD835\uDD41","jopf":"\uD835\uDD5B","Jscr":"\uD835\uDCA5","jscr":"\uD835\uDCBF","Jsercy":"\u0408","jsercy":"\u0458","Jukcy":"\u0404","jukcy":"\u0454","Kappa":"\u039A","kappa":"\u03BA","kappav":"\u03F0","Kcedil":"\u0136","kcedil":"\u0137","Kcy":"\u041A","kcy":"\u043A","Kfr":"\uD835\uDD0E","kfr":"\uD835\uDD28","kgreen":"\u0138","KHcy":"\u0425","khcy":"\u0445","KJcy":"\u040C","kjcy":"\u045C","Kopf":"\uD835\uDD42","kopf":"\uD835\uDD5C","Kscr":"\uD835\uDCA6","kscr":"\uD835\uDCC0","lAarr":"\u21DA","Lacute":"\u0139","lacute":"\u013A","laemptyv":"\u29B4","lagran":"\u2112","Lambda":"\u039B","lambda":"\u03BB","lang":"\u27E8","Lang":"\u27EA","langd":"\u2991","langle":"\u27E8","lap":"\u2A85","Laplacetrf":"\u2112","laquo":"\u00AB","larrb":"\u21E4","larrbfs":"\u291F","larr":"\u2190","Larr":"\u219E","lArr":"\u21D0","larrfs":"\u291D","larrhk":"\u21A9","larrlp":"\u21AB","larrpl":"\u2939","larrsim":"\u2973","larrtl":"\u21A2","latail":"\u2919","lAtail":"\u291B","lat":"\u2AAB","late":"\u2AAD","lates":"\u2AAD\uFE00","lbarr":"\u290C","lBarr":"\u290E","lbbrk":"\u2772","lbrace":"{","lbrack":"[","lbrke":"\u298B","lbrksld":"\u298F","lbrkslu":"\u298D","Lcaron":"\u013D","lcaron":"\u013E","Lcedil":"\u013B","lcedil":"\u013C","lceil":"\u2308","lcub":"{","Lcy":"\u041B","lcy":"\u043B","ldca":"\u2936","ldquo":"\u201C","ldquor":"\u201E","ldrdhar":"\u2967","ldrushar":"\u294B","ldsh":"\u21B2","le":"\u2264","lE":"\u2266","LeftAngleBracket":"\u27E8","LeftArrowBar":"\u21E4","leftarrow":"\u2190","LeftArrow":"\u2190","Leftarrow":"\u21D0","LeftArrowRightArrow":"\u21C6","leftarrowtail":"\u21A2","LeftCeiling":"\u2308","LeftDoubleBracket":"\u27E6","LeftDownTeeVector":"\u2961","LeftDownVectorBar":"\u2959","LeftDownVector":"\u21C3","LeftFloor":"\u230A","leftharpoondown":"\u21BD","leftharpoonup":"\u21BC","leftleftarrows":"\u21C7","leftrightarrow":"\u2194","LeftRightArrow":"\u2194","Leftrightarrow":"\u21D4","leftrightarrows":"\u21C6","leftrightharpoons":"\u21CB","leftrightsquigarrow":"\u21AD","LeftRightVector":"\u294E","LeftTeeArrow":"\u21A4","LeftTee":"\u22A3","LeftTeeVector":"\u295A","leftthreetimes":"\u22CB","LeftTriangleBar":"\u29CF","LeftTriangle":"\u22B2","LeftTriangleEqual":"\u22B4","LeftUpDownVector":"\u2951","LeftUpTeeVector":"\u2960","LeftUpVectorBar":"\u2958","LeftUpVector":"\u21BF","LeftVectorBar":"\u2952","LeftVector":"\u21BC","lEg":"\u2A8B","leg":"\u22DA","leq":"\u2264","leqq":"\u2266","leqslant":"\u2A7D","lescc":"\u2AA8","les":"\u2A7D","lesdot":"\u2A7F","lesdoto":"\u2A81","lesdotor":"\u2A83","lesg":"\u22DA\uFE00","lesges":"\u2A93","lessapprox":"\u2A85","lessdot":"\u22D6","lesseqgtr":"\u22DA","lesseqqgtr":"\u2A8B","LessEqualGreater":"\u22DA","LessFullEqual":"\u2266","LessGreater":"\u2276","lessgtr":"\u2276","LessLess":"\u2AA1","lesssim":"\u2272","LessSlantEqual":"\u2A7D","LessTilde":"\u2272","lfisht":"\u297C","lfloor":"\u230A","Lfr":"\uD835\uDD0F","lfr":"\uD835\uDD29","lg":"\u2276","lgE":"\u2A91","lHar":"\u2962","lhard":"\u21BD","lharu":"\u21BC","lharul":"\u296A","lhblk":"\u2584","LJcy":"\u0409","ljcy":"\u0459","llarr":"\u21C7","ll":"\u226A","Ll":"\u22D8","llcorner":"\u231E","Lleftarrow":"\u21DA","llhard":"\u296B","lltri":"\u25FA","Lmidot":"\u013F","lmidot":"\u0140","lmoustache":"\u23B0","lmoust":"\u23B0","lnap":"\u2A89","lnapprox":"\u2A89","lne":"\u2A87","lnE":"\u2268","lneq":"\u2A87","lneqq":"\u2268","lnsim":"\u22E6","loang":"\u27EC","loarr":"\u21FD","lobrk":"\u27E6","longleftarrow":"\u27F5","LongLeftArrow":"\u27F5","Longleftarrow":"\u27F8","longleftrightarrow":"\u27F7","LongLeftRightArrow":"\u27F7","Longleftrightarrow":"\u27FA","longmapsto":"\u27FC","longrightarrow":"\u27F6","LongRightArrow":"\u27F6","Longrightarrow":"\u27F9","looparrowleft":"\u21AB","looparrowright":"\u21AC","lopar":"\u2985","Lopf":"\uD835\uDD43","lopf":"\uD835\uDD5D","loplus":"\u2A2D","lotimes":"\u2A34","lowast":"\u2217","lowbar":"_","LowerLeftArrow":"\u2199","LowerRightArrow":"\u2198","loz":"\u25CA","lozenge":"\u25CA","lozf":"\u29EB","lpar":"(","lparlt":"\u2993","lrarr":"\u21C6","lrcorner":"\u231F","lrhar":"\u21CB","lrhard":"\u296D","lrm":"\u200E","lrtri":"\u22BF","lsaquo":"\u2039","lscr":"\uD835\uDCC1","Lscr":"\u2112","lsh":"\u21B0","Lsh":"\u21B0","lsim":"\u2272","lsime":"\u2A8D","lsimg":"\u2A8F","lsqb":"[","lsquo":"\u2018","lsquor":"\u201A","Lstrok":"\u0141","lstrok":"\u0142","ltcc":"\u2AA6","ltcir":"\u2A79","lt":"<","LT":"<","Lt":"\u226A","ltdot":"\u22D6","lthree":"\u22CB","ltimes":"\u22C9","ltlarr":"\u2976","ltquest":"\u2A7B","ltri":"\u25C3","ltrie":"\u22B4","ltrif":"\u25C2","ltrPar":"\u2996","lurdshar":"\u294A","luruhar":"\u2966","lvertneqq":"\u2268\uFE00","lvnE":"\u2268\uFE00","macr":"\u00AF","male":"\u2642","malt":"\u2720","maltese":"\u2720","Map":"\u2905","map":"\u21A6","mapsto":"\u21A6","mapstodown":"\u21A7","mapstoleft":"\u21A4","mapstoup":"\u21A5","marker":"\u25AE","mcomma":"\u2A29","Mcy":"\u041C","mcy":"\u043C","mdash":"\u2014","mDDot":"\u223A","measuredangle":"\u2221","MediumSpace":"\u205F","Mellintrf":"\u2133","Mfr":"\uD835\uDD10","mfr":"\uD835\uDD2A","mho":"\u2127","micro":"\u00B5","midast":"*","midcir":"\u2AF0","mid":"\u2223","middot":"\u00B7","minusb":"\u229F","minus":"\u2212","minusd":"\u2238","minusdu":"\u2A2A","MinusPlus":"\u2213","mlcp":"\u2ADB","mldr":"\u2026","mnplus":"\u2213","models":"\u22A7","Mopf":"\uD835\uDD44","mopf":"\uD835\uDD5E","mp":"\u2213","mscr":"\uD835\uDCC2","Mscr":"\u2133","mstpos":"\u223E","Mu":"\u039C","mu":"\u03BC","multimap":"\u22B8","mumap":"\u22B8","nabla":"\u2207","Nacute":"\u0143","nacute":"\u0144","nang":"\u2220\u20D2","nap":"\u2249","napE":"\u2A70\u0338","napid":"\u224B\u0338","napos":"\u0149","napprox":"\u2249","natural":"\u266E","naturals":"\u2115","natur":"\u266E","nbsp":"\u00A0","nbump":"\u224E\u0338","nbumpe":"\u224F\u0338","ncap":"\u2A43","Ncaron":"\u0147","ncaron":"\u0148","Ncedil":"\u0145","ncedil":"\u0146","ncong":"\u2247","ncongdot":"\u2A6D\u0338","ncup":"\u2A42","Ncy":"\u041D","ncy":"\u043D","ndash":"\u2013","nearhk":"\u2924","nearr":"\u2197","neArr":"\u21D7","nearrow":"\u2197","ne":"\u2260","nedot":"\u2250\u0338","NegativeMediumSpace":"\u200B","NegativeThickSpace":"\u200B","NegativeThinSpace":"\u200B","NegativeVeryThinSpace":"\u200B","nequiv":"\u2262","nesear":"\u2928","nesim":"\u2242\u0338","NestedGreaterGreater":"\u226B","NestedLessLess":"\u226A","NewLine":"\n","nexist":"\u2204","nexists":"\u2204","Nfr":"\uD835\uDD11","nfr":"\uD835\uDD2B","ngE":"\u2267\u0338","nge":"\u2271","ngeq":"\u2271","ngeqq":"\u2267\u0338","ngeqslant":"\u2A7E\u0338","nges":"\u2A7E\u0338","nGg":"\u22D9\u0338","ngsim":"\u2275","nGt":"\u226B\u20D2","ngt":"\u226F","ngtr":"\u226F","nGtv":"\u226B\u0338","nharr":"\u21AE","nhArr":"\u21CE","nhpar":"\u2AF2","ni":"\u220B","nis":"\u22FC","nisd":"\u22FA","niv":"\u220B","NJcy":"\u040A","njcy":"\u045A","nlarr":"\u219A","nlArr":"\u21CD","nldr":"\u2025","nlE":"\u2266\u0338","nle":"\u2270","nleftarrow":"\u219A","nLeftarrow":"\u21CD","nleftrightarrow":"\u21AE","nLeftrightarrow":"\u21CE","nleq":"\u2270","nleqq":"\u2266\u0338","nleqslant":"\u2A7D\u0338","nles":"\u2A7D\u0338","nless":"\u226E","nLl":"\u22D8\u0338","nlsim":"\u2274","nLt":"\u226A\u20D2","nlt":"\u226E","nltri":"\u22EA","nltrie":"\u22EC","nLtv":"\u226A\u0338","nmid":"\u2224","NoBreak":"\u2060","NonBreakingSpace":"\u00A0","nopf":"\uD835\uDD5F","Nopf":"\u2115","Not":"\u2AEC","not":"\u00AC","NotCongruent":"\u2262","NotCupCap":"\u226D","NotDoubleVerticalBar":"\u2226","NotElement":"\u2209","NotEqual":"\u2260","NotEqualTilde":"\u2242\u0338","NotExists":"\u2204","NotGreater":"\u226F","NotGreaterEqual":"\u2271","NotGreaterFullEqual":"\u2267\u0338","NotGreaterGreater":"\u226B\u0338","NotGreaterLess":"\u2279","NotGreaterSlantEqual":"\u2A7E\u0338","NotGreaterTilde":"\u2275","NotHumpDownHump":"\u224E\u0338","NotHumpEqual":"\u224F\u0338","notin":"\u2209","notindot":"\u22F5\u0338","notinE":"\u22F9\u0338","notinva":"\u2209","notinvb":"\u22F7","notinvc":"\u22F6","NotLeftTriangleBar":"\u29CF\u0338","NotLeftTriangle":"\u22EA","NotLeftTriangleEqual":"\u22EC","NotLess":"\u226E","NotLessEqual":"\u2270","NotLessGreater":"\u2278","NotLessLess":"\u226A\u0338","NotLessSlantEqual":"\u2A7D\u0338","NotLessTilde":"\u2274","NotNestedGreaterGreater":"\u2AA2\u0338","NotNestedLessLess":"\u2AA1\u0338","notni":"\u220C","notniva":"\u220C","notnivb":"\u22FE","notnivc":"\u22FD","NotPrecedes":"\u2280","NotPrecedesEqual":"\u2AAF\u0338","NotPrecedesSlantEqual":"\u22E0","NotReverseElement":"\u220C","NotRightTriangleBar":"\u29D0\u0338","NotRightTriangle":"\u22EB","NotRightTriangleEqual":"\u22ED","NotSquareSubset":"\u228F\u0338","NotSquareSubsetEqual":"\u22E2","NotSquareSuperset":"\u2290\u0338","NotSquareSupersetEqual":"\u22E3","NotSubset":"\u2282\u20D2","NotSubsetEqual":"\u2288","NotSucceeds":"\u2281","NotSucceedsEqual":"\u2AB0\u0338","NotSucceedsSlantEqual":"\u22E1","NotSucceedsTilde":"\u227F\u0338","NotSuperset":"\u2283\u20D2","NotSupersetEqual":"\u2289","NotTilde":"\u2241","NotTildeEqual":"\u2244","NotTildeFullEqual":"\u2247","NotTildeTilde":"\u2249","NotVerticalBar":"\u2224","nparallel":"\u2226","npar":"\u2226","nparsl":"\u2AFD\u20E5","npart":"\u2202\u0338","npolint":"\u2A14","npr":"\u2280","nprcue":"\u22E0","nprec":"\u2280","npreceq":"\u2AAF\u0338","npre":"\u2AAF\u0338","nrarrc":"\u2933\u0338","nrarr":"\u219B","nrArr":"\u21CF","nrarrw":"\u219D\u0338","nrightarrow":"\u219B","nRightarrow":"\u21CF","nrtri":"\u22EB","nrtrie":"\u22ED","nsc":"\u2281","nsccue":"\u22E1","nsce":"\u2AB0\u0338","Nscr":"\uD835\uDCA9","nscr":"\uD835\uDCC3","nshortmid":"\u2224","nshortparallel":"\u2226","nsim":"\u2241","nsime":"\u2244","nsimeq":"\u2244","nsmid":"\u2224","nspar":"\u2226","nsqsube":"\u22E2","nsqsupe":"\u22E3","nsub":"\u2284","nsubE":"\u2AC5\u0338","nsube":"\u2288","nsubset":"\u2282\u20D2","nsubseteq":"\u2288","nsubseteqq":"\u2AC5\u0338","nsucc":"\u2281","nsucceq":"\u2AB0\u0338","nsup":"\u2285","nsupE":"\u2AC6\u0338","nsupe":"\u2289","nsupset":"\u2283\u20D2","nsupseteq":"\u2289","nsupseteqq":"\u2AC6\u0338","ntgl":"\u2279","Ntilde":"\u00D1","ntilde":"\u00F1","ntlg":"\u2278","ntriangleleft":"\u22EA","ntrianglelefteq":"\u22EC","ntriangleright":"\u22EB","ntrianglerighteq":"\u22ED","Nu":"\u039D","nu":"\u03BD","num":"#","numero":"\u2116","numsp":"\u2007","nvap":"\u224D\u20D2","nvdash":"\u22AC","nvDash":"\u22AD","nVdash":"\u22AE","nVDash":"\u22AF","nvge":"\u2265\u20D2","nvgt":">\u20D2","nvHarr":"\u2904","nvinfin":"\u29DE","nvlArr":"\u2902","nvle":"\u2264\u20D2","nvlt":"<\u20D2","nvltrie":"\u22B4\u20D2","nvrArr":"\u2903","nvrtrie":"\u22B5\u20D2","nvsim":"\u223C\u20D2","nwarhk":"\u2923","nwarr":"\u2196","nwArr":"\u21D6","nwarrow":"\u2196","nwnear":"\u2927","Oacute":"\u00D3","oacute":"\u00F3","oast":"\u229B","Ocirc":"\u00D4","ocirc":"\u00F4","ocir":"\u229A","Ocy":"\u041E","ocy":"\u043E","odash":"\u229D","Odblac":"\u0150","odblac":"\u0151","odiv":"\u2A38","odot":"\u2299","odsold":"\u29BC","OElig":"\u0152","oelig":"\u0153","ofcir":"\u29BF","Ofr":"\uD835\uDD12","ofr":"\uD835\uDD2C","ogon":"\u02DB","Ograve":"\u00D2","ograve":"\u00F2","ogt":"\u29C1","ohbar":"\u29B5","ohm":"\u03A9","oint":"\u222E","olarr":"\u21BA","olcir":"\u29BE","olcross":"\u29BB","oline":"\u203E","olt":"\u29C0","Omacr":"\u014C","omacr":"\u014D","Omega":"\u03A9","omega":"\u03C9","Omicron":"\u039F","omicron":"\u03BF","omid":"\u29B6","ominus":"\u2296","Oopf":"\uD835\uDD46","oopf":"\uD835\uDD60","opar":"\u29B7","OpenCurlyDoubleQuote":"\u201C","OpenCurlyQuote":"\u2018","operp":"\u29B9","oplus":"\u2295","orarr":"\u21BB","Or":"\u2A54","or":"\u2228","ord":"\u2A5D","order":"\u2134","orderof":"\u2134","ordf":"\u00AA","ordm":"\u00BA","origof":"\u22B6","oror":"\u2A56","orslope":"\u2A57","orv":"\u2A5B","oS":"\u24C8","Oscr":"\uD835\uDCAA","oscr":"\u2134","Oslash":"\u00D8","oslash":"\u00F8","osol":"\u2298","Otilde":"\u00D5","otilde":"\u00F5","otimesas":"\u2A36","Otimes":"\u2A37","otimes":"\u2297","Ouml":"\u00D6","ouml":"\u00F6","ovbar":"\u233D","OverBar":"\u203E","OverBrace":"\u23DE","OverBracket":"\u23B4","OverParenthesis":"\u23DC","para":"\u00B6","parallel":"\u2225","par":"\u2225","parsim":"\u2AF3","parsl":"\u2AFD","part":"\u2202","PartialD":"\u2202","Pcy":"\u041F","pcy":"\u043F","percnt":"%","period":".","permil":"\u2030","perp":"\u22A5","pertenk":"\u2031","Pfr":"\uD835\uDD13","pfr":"\uD835\uDD2D","Phi":"\u03A6","phi":"\u03C6","phiv":"\u03D5","phmmat":"\u2133","phone":"\u260E","Pi":"\u03A0","pi":"\u03C0","pitchfork":"\u22D4","piv":"\u03D6","planck":"\u210F","planckh":"\u210E","plankv":"\u210F","plusacir":"\u2A23","plusb":"\u229E","pluscir":"\u2A22","plus":"+","plusdo":"\u2214","plusdu":"\u2A25","pluse":"\u2A72","PlusMinus":"\u00B1","plusmn":"\u00B1","plussim":"\u2A26","plustwo":"\u2A27","pm":"\u00B1","Poincareplane":"\u210C","pointint":"\u2A15","popf":"\uD835\uDD61","Popf":"\u2119","pound":"\u00A3","prap":"\u2AB7","Pr":"\u2ABB","pr":"\u227A","prcue":"\u227C","precapprox":"\u2AB7","prec":"\u227A","preccurlyeq":"\u227C","Precedes":"\u227A","PrecedesEqual":"\u2AAF","PrecedesSlantEqual":"\u227C","PrecedesTilde":"\u227E","preceq":"\u2AAF","precnapprox":"\u2AB9","precneqq":"\u2AB5","precnsim":"\u22E8","pre":"\u2AAF","prE":"\u2AB3","precsim":"\u227E","prime":"\u2032","Prime":"\u2033","primes":"\u2119","prnap":"\u2AB9","prnE":"\u2AB5","prnsim":"\u22E8","prod":"\u220F","Product":"\u220F","profalar":"\u232E","profline":"\u2312","profsurf":"\u2313","prop":"\u221D","Proportional":"\u221D","Proportion":"\u2237","propto":"\u221D","prsim":"\u227E","prurel":"\u22B0","Pscr":"\uD835\uDCAB","pscr":"\uD835\uDCC5","Psi":"\u03A8","psi":"\u03C8","puncsp":"\u2008","Qfr":"\uD835\uDD14","qfr":"\uD835\uDD2E","qint":"\u2A0C","qopf":"\uD835\uDD62","Qopf":"\u211A","qprime":"\u2057","Qscr":"\uD835\uDCAC","qscr":"\uD835\uDCC6","quaternions":"\u210D","quatint":"\u2A16","quest":"?","questeq":"\u225F","quot":"\"","QUOT":"\"","rAarr":"\u21DB","race":"\u223D\u0331","Racute":"\u0154","racute":"\u0155","radic":"\u221A","raemptyv":"\u29B3","rang":"\u27E9","Rang":"\u27EB","rangd":"\u2992","range":"\u29A5","rangle":"\u27E9","raquo":"\u00BB","rarrap":"\u2975","rarrb":"\u21E5","rarrbfs":"\u2920","rarrc":"\u2933","rarr":"\u2192","Rarr":"\u21A0","rArr":"\u21D2","rarrfs":"\u291E","rarrhk":"\u21AA","rarrlp":"\u21AC","rarrpl":"\u2945","rarrsim":"\u2974","Rarrtl":"\u2916","rarrtl":"\u21A3","rarrw":"\u219D","ratail":"\u291A","rAtail":"\u291C","ratio":"\u2236","rationals":"\u211A","rbarr":"\u290D","rBarr":"\u290F","RBarr":"\u2910","rbbrk":"\u2773","rbrace":"}","rbrack":"]","rbrke":"\u298C","rbrksld":"\u298E","rbrkslu":"\u2990","Rcaron":"\u0158","rcaron":"\u0159","Rcedil":"\u0156","rcedil":"\u0157","rceil":"\u2309","rcub":"}","Rcy":"\u0420","rcy":"\u0440","rdca":"\u2937","rdldhar":"\u2969","rdquo":"\u201D","rdquor":"\u201D","rdsh":"\u21B3","real":"\u211C","realine":"\u211B","realpart":"\u211C","reals":"\u211D","Re":"\u211C","rect":"\u25AD","reg":"\u00AE","REG":"\u00AE","ReverseElement":"\u220B","ReverseEquilibrium":"\u21CB","ReverseUpEquilibrium":"\u296F","rfisht":"\u297D","rfloor":"\u230B","rfr":"\uD835\uDD2F","Rfr":"\u211C","rHar":"\u2964","rhard":"\u21C1","rharu":"\u21C0","rharul":"\u296C","Rho":"\u03A1","rho":"\u03C1","rhov":"\u03F1","RightAngleBracket":"\u27E9","RightArrowBar":"\u21E5","rightarrow":"\u2192","RightArrow":"\u2192","Rightarrow":"\u21D2","RightArrowLeftArrow":"\u21C4","rightarrowtail":"\u21A3","RightCeiling":"\u2309","RightDoubleBracket":"\u27E7","RightDownTeeVector":"\u295D","RightDownVectorBar":"\u2955","RightDownVector":"\u21C2","RightFloor":"\u230B","rightharpoondown":"\u21C1","rightharpoonup":"\u21C0","rightleftarrows":"\u21C4","rightleftharpoons":"\u21CC","rightrightarrows":"\u21C9","rightsquigarrow":"\u219D","RightTeeArrow":"\u21A6","RightTee":"\u22A2","RightTeeVector":"\u295B","rightthreetimes":"\u22CC","RightTriangleBar":"\u29D0","RightTriangle":"\u22B3","RightTriangleEqual":"\u22B5","RightUpDownVector":"\u294F","RightUpTeeVector":"\u295C","RightUpVectorBar":"\u2954","RightUpVector":"\u21BE","RightVectorBar":"\u2953","RightVector":"\u21C0","ring":"\u02DA","risingdotseq":"\u2253","rlarr":"\u21C4","rlhar":"\u21CC","rlm":"\u200F","rmoustache":"\u23B1","rmoust":"\u23B1","rnmid":"\u2AEE","roang":"\u27ED","roarr":"\u21FE","robrk":"\u27E7","ropar":"\u2986","ropf":"\uD835\uDD63","Ropf":"\u211D","roplus":"\u2A2E","rotimes":"\u2A35","RoundImplies":"\u2970","rpar":")","rpargt":"\u2994","rppolint":"\u2A12","rrarr":"\u21C9","Rrightarrow":"\u21DB","rsaquo":"\u203A","rscr":"\uD835\uDCC7","Rscr":"\u211B","rsh":"\u21B1","Rsh":"\u21B1","rsqb":"]","rsquo":"\u2019","rsquor":"\u2019","rthree":"\u22CC","rtimes":"\u22CA","rtri":"\u25B9","rtrie":"\u22B5","rtrif":"\u25B8","rtriltri":"\u29CE","RuleDelayed":"\u29F4","ruluhar":"\u2968","rx":"\u211E","Sacute":"\u015A","sacute":"\u015B","sbquo":"\u201A","scap":"\u2AB8","Scaron":"\u0160","scaron":"\u0161","Sc":"\u2ABC","sc":"\u227B","sccue":"\u227D","sce":"\u2AB0","scE":"\u2AB4","Scedil":"\u015E","scedil":"\u015F","Scirc":"\u015C","scirc":"\u015D","scnap":"\u2ABA","scnE":"\u2AB6","scnsim":"\u22E9","scpolint":"\u2A13","scsim":"\u227F","Scy":"\u0421","scy":"\u0441","sdotb":"\u22A1","sdot":"\u22C5","sdote":"\u2A66","searhk":"\u2925","searr":"\u2198","seArr":"\u21D8","searrow":"\u2198","sect":"\u00A7","semi":";","seswar":"\u2929","setminus":"\u2216","setmn":"\u2216","sext":"\u2736","Sfr":"\uD835\uDD16","sfr":"\uD835\uDD30","sfrown":"\u2322","sharp":"\u266F","SHCHcy":"\u0429","shchcy":"\u0449","SHcy":"\u0428","shcy":"\u0448","ShortDownArrow":"\u2193","ShortLeftArrow":"\u2190","shortmid":"\u2223","shortparallel":"\u2225","ShortRightArrow":"\u2192","ShortUpArrow":"\u2191","shy":"\u00AD","Sigma":"\u03A3","sigma":"\u03C3","sigmaf":"\u03C2","sigmav":"\u03C2","sim":"\u223C","simdot":"\u2A6A","sime":"\u2243","simeq":"\u2243","simg":"\u2A9E","simgE":"\u2AA0","siml":"\u2A9D","simlE":"\u2A9F","simne":"\u2246","simplus":"\u2A24","simrarr":"\u2972","slarr":"\u2190","SmallCircle":"\u2218","smallsetminus":"\u2216","smashp":"\u2A33","smeparsl":"\u29E4","smid":"\u2223","smile":"\u2323","smt":"\u2AAA","smte":"\u2AAC","smtes":"\u2AAC\uFE00","SOFTcy":"\u042C","softcy":"\u044C","solbar":"\u233F","solb":"\u29C4","sol":"/","Sopf":"\uD835\uDD4A","sopf":"\uD835\uDD64","spades":"\u2660","spadesuit":"\u2660","spar":"\u2225","sqcap":"\u2293","sqcaps":"\u2293\uFE00","sqcup":"\u2294","sqcups":"\u2294\uFE00","Sqrt":"\u221A","sqsub":"\u228F","sqsube":"\u2291","sqsubset":"\u228F","sqsubseteq":"\u2291","sqsup":"\u2290","sqsupe":"\u2292","sqsupset":"\u2290","sqsupseteq":"\u2292","square":"\u25A1","Square":"\u25A1","SquareIntersection":"\u2293","SquareSubset":"\u228F","SquareSubsetEqual":"\u2291","SquareSuperset":"\u2290","SquareSupersetEqual":"\u2292","SquareUnion":"\u2294","squarf":"\u25AA","squ":"\u25A1","squf":"\u25AA","srarr":"\u2192","Sscr":"\uD835\uDCAE","sscr":"\uD835\uDCC8","ssetmn":"\u2216","ssmile":"\u2323","sstarf":"\u22C6","Star":"\u22C6","star":"\u2606","starf":"\u2605","straightepsilon":"\u03F5","straightphi":"\u03D5","strns":"\u00AF","sub":"\u2282","Sub":"\u22D0","subdot":"\u2ABD","subE":"\u2AC5","sube":"\u2286","subedot":"\u2AC3","submult":"\u2AC1","subnE":"\u2ACB","subne":"\u228A","subplus":"\u2ABF","subrarr":"\u2979","subset":"\u2282","Subset":"\u22D0","subseteq":"\u2286","subseteqq":"\u2AC5","SubsetEqual":"\u2286","subsetneq":"\u228A","subsetneqq":"\u2ACB","subsim":"\u2AC7","subsub":"\u2AD5","subsup":"\u2AD3","succapprox":"\u2AB8","succ":"\u227B","succcurlyeq":"\u227D","Succeeds":"\u227B","SucceedsEqual":"\u2AB0","SucceedsSlantEqual":"\u227D","SucceedsTilde":"\u227F","succeq":"\u2AB0","succnapprox":"\u2ABA","succneqq":"\u2AB6","succnsim":"\u22E9","succsim":"\u227F","SuchThat":"\u220B","sum":"\u2211","Sum":"\u2211","sung":"\u266A","sup1":"\u00B9","sup2":"\u00B2","sup3":"\u00B3","sup":"\u2283","Sup":"\u22D1","supdot":"\u2ABE","supdsub":"\u2AD8","supE":"\u2AC6","supe":"\u2287","supedot":"\u2AC4","Superset":"\u2283","SupersetEqual":"\u2287","suphsol":"\u27C9","suphsub":"\u2AD7","suplarr":"\u297B","supmult":"\u2AC2","supnE":"\u2ACC","supne":"\u228B","supplus":"\u2AC0","supset":"\u2283","Supset":"\u22D1","supseteq":"\u2287","supseteqq":"\u2AC6","supsetneq":"\u228B","supsetneqq":"\u2ACC","supsim":"\u2AC8","supsub":"\u2AD4","supsup":"\u2AD6","swarhk":"\u2926","swarr":"\u2199","swArr":"\u21D9","swarrow":"\u2199","swnwar":"\u292A","szlig":"\u00DF","Tab":"\t","target":"\u2316","Tau":"\u03A4","tau":"\u03C4","tbrk":"\u23B4","Tcaron":"\u0164","tcaron":"\u0165","Tcedil":"\u0162","tcedil":"\u0163","Tcy":"\u0422","tcy":"\u0442","tdot":"\u20DB","telrec":"\u2315","Tfr":"\uD835\uDD17","tfr":"\uD835\uDD31","there4":"\u2234","therefore":"\u2234","Therefore":"\u2234","Theta":"\u0398","theta":"\u03B8","thetasym":"\u03D1","thetav":"\u03D1","thickapprox":"\u2248","thicksim":"\u223C","ThickSpace":"\u205F\u200A","ThinSpace":"\u2009","thinsp":"\u2009","thkap":"\u2248","thksim":"\u223C","THORN":"\u00DE","thorn":"\u00FE","tilde":"\u02DC","Tilde":"\u223C","TildeEqual":"\u2243","TildeFullEqual":"\u2245","TildeTilde":"\u2248","timesbar":"\u2A31","timesb":"\u22A0","times":"\u00D7","timesd":"\u2A30","tint":"\u222D","toea":"\u2928","topbot":"\u2336","topcir":"\u2AF1","top":"\u22A4","Topf":"\uD835\uDD4B","topf":"\uD835\uDD65","topfork":"\u2ADA","tosa":"\u2929","tprime":"\u2034","trade":"\u2122","TRADE":"\u2122","triangle":"\u25B5","triangledown":"\u25BF","triangleleft":"\u25C3","trianglelefteq":"\u22B4","triangleq":"\u225C","triangleright":"\u25B9","trianglerighteq":"\u22B5","tridot":"\u25EC","trie":"\u225C","triminus":"\u2A3A","TripleDot":"\u20DB","triplus":"\u2A39","trisb":"\u29CD","tritime":"\u2A3B","trpezium":"\u23E2","Tscr":"\uD835\uDCAF","tscr":"\uD835\uDCC9","TScy":"\u0426","tscy":"\u0446","TSHcy":"\u040B","tshcy":"\u045B","Tstrok":"\u0166","tstrok":"\u0167","twixt":"\u226C","twoheadleftarrow":"\u219E","twoheadrightarrow":"\u21A0","Uacute":"\u00DA","uacute":"\u00FA","uarr":"\u2191","Uarr":"\u219F","uArr":"\u21D1","Uarrocir":"\u2949","Ubrcy":"\u040E","ubrcy":"\u045E","Ubreve":"\u016C","ubreve":"\u016D","Ucirc":"\u00DB","ucirc":"\u00FB","Ucy":"\u0423","ucy":"\u0443","udarr":"\u21C5","Udblac":"\u0170","udblac":"\u0171","udhar":"\u296E","ufisht":"\u297E","Ufr":"\uD835\uDD18","ufr":"\uD835\uDD32","Ugrave":"\u00D9","ugrave":"\u00F9","uHar":"\u2963","uharl":"\u21BF","uharr":"\u21BE","uhblk":"\u2580","ulcorn":"\u231C","ulcorner":"\u231C","ulcrop":"\u230F","ultri":"\u25F8","Umacr":"\u016A","umacr":"\u016B","uml":"\u00A8","UnderBar":"_","UnderBrace":"\u23DF","UnderBracket":"\u23B5","UnderParenthesis":"\u23DD","Union":"\u22C3","UnionPlus":"\u228E","Uogon":"\u0172","uogon":"\u0173","Uopf":"\uD835\uDD4C","uopf":"\uD835\uDD66","UpArrowBar":"\u2912","uparrow":"\u2191","UpArrow":"\u2191","Uparrow":"\u21D1","UpArrowDownArrow":"\u21C5","updownarrow":"\u2195","UpDownArrow":"\u2195","Updownarrow":"\u21D5","UpEquilibrium":"\u296E","upharpoonleft":"\u21BF","upharpoonright":"\u21BE","uplus":"\u228E","UpperLeftArrow":"\u2196","UpperRightArrow":"\u2197","upsi":"\u03C5","Upsi":"\u03D2","upsih":"\u03D2","Upsilon":"\u03A5","upsilon":"\u03C5","UpTeeArrow":"\u21A5","UpTee":"\u22A5","upuparrows":"\u21C8","urcorn":"\u231D","urcorner":"\u231D","urcrop":"\u230E","Uring":"\u016E","uring":"\u016F","urtri":"\u25F9","Uscr":"\uD835\uDCB0","uscr":"\uD835\uDCCA","utdot":"\u22F0","Utilde":"\u0168","utilde":"\u0169","utri":"\u25B5","utrif":"\u25B4","uuarr":"\u21C8","Uuml":"\u00DC","uuml":"\u00FC","uwangle":"\u29A7","vangrt":"\u299C","varepsilon":"\u03F5","varkappa":"\u03F0","varnothing":"\u2205","varphi":"\u03D5","varpi":"\u03D6","varpropto":"\u221D","varr":"\u2195","vArr":"\u21D5","varrho":"\u03F1","varsigma":"\u03C2","varsubsetneq":"\u228A\uFE00","varsubsetneqq":"\u2ACB\uFE00","varsupsetneq":"\u228B\uFE00","varsupsetneqq":"\u2ACC\uFE00","vartheta":"\u03D1","vartriangleleft":"\u22B2","vartriangleright":"\u22B3","vBar":"\u2AE8","Vbar":"\u2AEB","vBarv":"\u2AE9","Vcy":"\u0412","vcy":"\u0432","vdash":"\u22A2","vDash":"\u22A8","Vdash":"\u22A9","VDash":"\u22AB","Vdashl":"\u2AE6","veebar":"\u22BB","vee":"\u2228","Vee":"\u22C1","veeeq":"\u225A","vellip":"\u22EE","verbar":"|","Verbar":"\u2016","vert":"|","Vert":"\u2016","VerticalBar":"\u2223","VerticalLine":"|","VerticalSeparator":"\u2758","VerticalTilde":"\u2240","VeryThinSpace":"\u200A","Vfr":"\uD835\uDD19","vfr":"\uD835\uDD33","vltri":"\u22B2","vnsub":"\u2282\u20D2","vnsup":"\u2283\u20D2","Vopf":"\uD835\uDD4D","vopf":"\uD835\uDD67","vprop":"\u221D","vrtri":"\u22B3","Vscr":"\uD835\uDCB1","vscr":"\uD835\uDCCB","vsubnE":"\u2ACB\uFE00","vsubne":"\u228A\uFE00","vsupnE":"\u2ACC\uFE00","vsupne":"\u228B\uFE00","Vvdash":"\u22AA","vzigzag":"\u299A","Wcirc":"\u0174","wcirc":"\u0175","wedbar":"\u2A5F","wedge":"\u2227","Wedge":"\u22C0","wedgeq":"\u2259","weierp":"\u2118","Wfr":"\uD835\uDD1A","wfr":"\uD835\uDD34","Wopf":"\uD835\uDD4E","wopf":"\uD835\uDD68","wp":"\u2118","wr":"\u2240","wreath":"\u2240","Wscr":"\uD835\uDCB2","wscr":"\uD835\uDCCC","xcap":"\u22C2","xcirc":"\u25EF","xcup":"\u22C3","xdtri":"\u25BD","Xfr":"\uD835\uDD1B","xfr":"\uD835\uDD35","xharr":"\u27F7","xhArr":"\u27FA","Xi":"\u039E","xi":"\u03BE","xlarr":"\u27F5","xlArr":"\u27F8","xmap":"\u27FC","xnis":"\u22FB","xodot":"\u2A00","Xopf":"\uD835\uDD4F","xopf":"\uD835\uDD69","xoplus":"\u2A01","xotime":"\u2A02","xrarr":"\u27F6","xrArr":"\u27F9","Xscr":"\uD835\uDCB3","xscr":"\uD835\uDCCD","xsqcup":"\u2A06","xuplus":"\u2A04","xutri":"\u25B3","xvee":"\u22C1","xwedge":"\u22C0","Yacute":"\u00DD","yacute":"\u00FD","YAcy":"\u042F","yacy":"\u044F","Ycirc":"\u0176","ycirc":"\u0177","Ycy":"\u042B","ycy":"\u044B","yen":"\u00A5","Yfr":"\uD835\uDD1C","yfr":"\uD835\uDD36","YIcy":"\u0407","yicy":"\u0457","Yopf":"\uD835\uDD50","yopf":"\uD835\uDD6A","Yscr":"\uD835\uDCB4","yscr":"\uD835\uDCCE","YUcy":"\u042E","yucy":"\u044E","yuml":"\u00FF","Yuml":"\u0178","Zacute":"\u0179","zacute":"\u017A","Zcaron":"\u017D","zcaron":"\u017E","Zcy":"\u0417","zcy":"\u0437","Zdot":"\u017B","zdot":"\u017C","zeetrf":"\u2128","ZeroWidthSpace":"\u200B","Zeta":"\u0396","zeta":"\u03B6","zfr":"\uD835\uDD37","Zfr":"\u2128","ZHcy":"\u0416","zhcy":"\u0436","zigrarr":"\u21DD","zopf":"\uD835\uDD6B","Zopf":"\u2124","Zscr":"\uD835\uDCB5","zscr":"\uD835\uDCCF","zwj":"\u200D","zwnj":"\u200C"}
 },{}],34:[function(require,module,exports){
+module.exports={"Aacute":"\u00C1","aacute":"\u00E1","Acirc":"\u00C2","acirc":"\u00E2","acute":"\u00B4","AElig":"\u00C6","aelig":"\u00E6","Agrave":"\u00C0","agrave":"\u00E0","amp":"&","AMP":"&","Aring":"\u00C5","aring":"\u00E5","Atilde":"\u00C3","atilde":"\u00E3","Auml":"\u00C4","auml":"\u00E4","brvbar":"\u00A6","Ccedil":"\u00C7","ccedil":"\u00E7","cedil":"\u00B8","cent":"\u00A2","copy":"\u00A9","COPY":"\u00A9","curren":"\u00A4","deg":"\u00B0","divide":"\u00F7","Eacute":"\u00C9","eacute":"\u00E9","Ecirc":"\u00CA","ecirc":"\u00EA","Egrave":"\u00C8","egrave":"\u00E8","ETH":"\u00D0","eth":"\u00F0","Euml":"\u00CB","euml":"\u00EB","frac12":"\u00BD","frac14":"\u00BC","frac34":"\u00BE","gt":">","GT":">","Iacute":"\u00CD","iacute":"\u00ED","Icirc":"\u00CE","icirc":"\u00EE","iexcl":"\u00A1","Igrave":"\u00CC","igrave":"\u00EC","iquest":"\u00BF","Iuml":"\u00CF","iuml":"\u00EF","laquo":"\u00AB","lt":"<","LT":"<","macr":"\u00AF","micro":"\u00B5","middot":"\u00B7","nbsp":"\u00A0","not":"\u00AC","Ntilde":"\u00D1","ntilde":"\u00F1","Oacute":"\u00D3","oacute":"\u00F3","Ocirc":"\u00D4","ocirc":"\u00F4","Ograve":"\u00D2","ograve":"\u00F2","ordf":"\u00AA","ordm":"\u00BA","Oslash":"\u00D8","oslash":"\u00F8","Otilde":"\u00D5","otilde":"\u00F5","Ouml":"\u00D6","ouml":"\u00F6","para":"\u00B6","plusmn":"\u00B1","pound":"\u00A3","quot":"\"","QUOT":"\"","raquo":"\u00BB","reg":"\u00AE","REG":"\u00AE","sect":"\u00A7","shy":"\u00AD","sup1":"\u00B9","sup2":"\u00B2","sup3":"\u00B3","szlig":"\u00DF","THORN":"\u00DE","thorn":"\u00FE","times":"\u00D7","Uacute":"\u00DA","uacute":"\u00FA","Ucirc":"\u00DB","ucirc":"\u00FB","Ugrave":"\u00D9","ugrave":"\u00F9","uml":"\u00A8","Uuml":"\u00DC","uuml":"\u00FC","Yacute":"\u00DD","yacute":"\u00FD","yen":"\u00A5","yuml":"\u00FF"}
+},{}],35:[function(require,module,exports){
 module.exports={"amp":"&","apos":"'","gt":">","lt":"<","quot":"\""}
 
-},{}],35:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 'use strict';
 
 var has = require('has');
@@ -4359,6 +4440,7 @@ var toPrimitive = require('es-to-primitive/es6');
 
 var toStr = Object.prototype.toString;
 var hasSymbols = typeof Symbol === 'function' && typeof Symbol.iterator === 'symbol';
+var SymbolIterator = hasSymbols ? Symbol.iterator : null;
 
 var $isNaN = require('./helpers/isNaN');
 var $isFinite = require('./helpers/isFinite');
@@ -4782,6 +4864,95 @@ var ES6 = assign(assign({}, ES5), {
 		return this.Call(func, O, argumentsList);
 	},
 
+	// http://ecma-international.org/ecma-262/6.0/#sec-getiterator
+	GetIterator: function GetIterator(obj, method) {
+		if (!hasSymbols) {
+			throw new SyntaxError('ES.GetIterator depends on native iterator support.');
+		}
+
+		var actualMethod = method;
+		if (arguments.length < 2) {
+			actualMethod = this.GetMethod(obj, SymbolIterator);
+		}
+		var iterator = this.Call(actualMethod, obj);
+		if (this.Type(iterator) !== 'Object') {
+			throw new TypeError('iterator must return an object');
+		}
+
+		return iterator;
+	},
+
+	// http://ecma-international.org/ecma-262/6.0/#sec-iteratornext
+	IteratorNext: function IteratorNext(iterator, value) {
+		var result = this.Invoke(iterator, 'next', arguments.length < 2 ? [] : [value]);
+		if (this.Type(result) !== 'Object') {
+			throw new TypeError('iterator next must return an object');
+		}
+		return result;
+	},
+
+	// http://ecma-international.org/ecma-262/6.0/#sec-iteratorcomplete
+	IteratorComplete: function IteratorComplete(iterResult) {
+		if (this.Type(iterResult) !== 'Object') {
+			throw new TypeError('Assertion failed: Type(iterResult) is not Object');
+		}
+		return this.ToBoolean(this.Get(iterResult, 'done'));
+	},
+
+	// http://ecma-international.org/ecma-262/6.0/#sec-iteratorvalue
+	IteratorValue: function IteratorValue(iterResult) {
+		if (this.Type(iterResult) !== 'Object') {
+			throw new TypeError('Assertion failed: Type(iterResult) is not Object');
+		}
+		return this.Get(iterResult, 'value');
+	},
+
+	// http://ecma-international.org/ecma-262/6.0/#sec-iteratorstep
+	IteratorStep: function IteratorStep(iterator) {
+		var result = this.IteratorNext(iterator);
+		var done = this.IteratorComplete(result);
+		return done === true ? false : result;
+	},
+
+	// http://ecma-international.org/ecma-262/6.0/#sec-iteratorclose
+	IteratorClose: function IteratorClose(iterator, completion) {
+		if (this.Type(iterator) !== 'Object') {
+			throw new TypeError('Assertion failed: Type(iterator) is not Object');
+		}
+		if (!this.IsCallable(completion)) {
+			throw new TypeError('Assertion failed: completion is not a thunk for a Completion Record');
+		}
+		var completionThunk = completion;
+
+		var iteratorReturn = this.GetMethod(iterator, 'return');
+
+		if (typeof iteratorReturn === 'undefined') {
+			return completionThunk();
+		}
+
+		var completionRecord;
+		try {
+			var innerResult = this.Call(iteratorReturn, iterator, []);
+		} catch (e) {
+			// if we hit here, then "e" is the innerResult completion that needs re-throwing
+
+			// if the completion is of type "throw", this will throw.
+			completionRecord = completionThunk();
+			completionThunk = null; // ensure it's not called twice.
+
+			// if not, then return the innerResult completion
+			throw e;
+		}
+		completionRecord = completionThunk(); // if innerResult worked, then throw if the completion does
+		completionThunk = null; // ensure it's not called twice.
+
+		if (this.Type(innerResult) !== 'Object') {
+			throw new TypeError('iterator .return must return an object');
+		}
+
+		return completionRecord;
+	},
+
 	// http://ecma-international.org/ecma-262/6.0/#sec-createiterresultobject
 	CreateIterResultObject: function CreateIterResultObject(value, done) {
 		if (this.Type(done) !== 'Boolean') {
@@ -4918,7 +5089,7 @@ delete ES6.CheckObjectCoercible; // renamed in ES6 to RequireObjectCoercible
 
 module.exports = ES6;
 
-},{"./es5":36,"./helpers/assign":38,"./helpers/isFinite":39,"./helpers/isNaN":40,"./helpers/isPrimitive":41,"./helpers/mod":42,"./helpers/sign":43,"es-to-primitive/es6":45,"function-bind":50,"has":51,"is-regex":69}],36:[function(require,module,exports){
+},{"./es5":37,"./helpers/assign":39,"./helpers/isFinite":40,"./helpers/isNaN":41,"./helpers/isPrimitive":42,"./helpers/mod":43,"./helpers/sign":44,"es-to-primitive/es6":46,"function-bind":51,"has":52,"is-regex":71}],37:[function(require,module,exports){
 'use strict';
 
 var $isNaN = require('./helpers/isNaN');
@@ -5156,12 +5327,12 @@ var ES5 = {
 
 module.exports = ES5;
 
-},{"./helpers/isFinite":39,"./helpers/isNaN":40,"./helpers/mod":42,"./helpers/sign":43,"es-to-primitive/es5":44,"has":51,"is-callable":67}],37:[function(require,module,exports){
+},{"./helpers/isFinite":40,"./helpers/isNaN":41,"./helpers/mod":43,"./helpers/sign":44,"es-to-primitive/es5":45,"has":52,"is-callable":69}],38:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./es2015');
 
-},{"./es2015":35}],38:[function(require,module,exports){
+},{"./es2015":36}],39:[function(require,module,exports){
 var has = Object.prototype.hasOwnProperty;
 module.exports = function assign(target, source) {
 	if (Object.assign) {
@@ -5175,33 +5346,33 @@ module.exports = function assign(target, source) {
 	return target;
 };
 
-},{}],39:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 var $isNaN = Number.isNaN || function (a) { return a !== a; };
 
 module.exports = Number.isFinite || function (x) { return typeof x === 'number' && !$isNaN(x) && x !== Infinity && x !== -Infinity; };
 
-},{}],40:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 module.exports = Number.isNaN || function isNaN(a) {
 	return a !== a;
 };
 
-},{}],41:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 module.exports = function isPrimitive(value) {
 	return value === null || (typeof value !== 'function' && typeof value !== 'object');
 };
 
-},{}],42:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 module.exports = function mod(number, modulo) {
 	var remain = number % modulo;
 	return Math.floor(remain >= 0 ? remain : remain + modulo);
 };
 
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 module.exports = function sign(number) {
 	return number >= 0 ? 1 : -1;
 };
 
-},{}],44:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 'use strict';
 
 var toStr = Object.prototype.toString;
@@ -5240,7 +5411,7 @@ module.exports = function ToPrimitive(input, PreferredType) {
 	return ES5internalSlots['[[DefaultValue]]'](input, PreferredType);
 };
 
-},{"./helpers/isPrimitive":46,"is-callable":67}],45:[function(require,module,exports){
+},{"./helpers/isPrimitive":47,"is-callable":69}],46:[function(require,module,exports){
 'use strict';
 
 var hasSymbols = typeof Symbol === 'function' && typeof Symbol.iterator === 'symbol';
@@ -5316,9 +5487,9 @@ module.exports = function ToPrimitive(input, PreferredType) {
 	return ordinaryToPrimitive(input, hint === 'default' ? 'number' : hint);
 };
 
-},{"./helpers/isPrimitive":46,"is-callable":67,"is-date-object":68,"is-symbol":70}],46:[function(require,module,exports){
-arguments[4][41][0].apply(exports,arguments)
-},{"dup":41}],47:[function(require,module,exports){
+},{"./helpers/isPrimitive":47,"is-callable":69,"is-date-object":70,"is-symbol":72}],47:[function(require,module,exports){
+arguments[4][42][0].apply(exports,arguments)
+},{"dup":42}],48:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -5622,7 +5793,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],48:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 
 var hasOwn = Object.prototype.hasOwnProperty;
 var toString = Object.prototype.toString;
@@ -5646,7 +5817,7 @@ module.exports = function forEach (obj, fn, ctx) {
 };
 
 
-},{}],49:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 'use strict';
 
 /* eslint no-invalid-this: 1 */
@@ -5700,19 +5871,19 @@ module.exports = function bind(that) {
     return bound;
 };
 
-},{}],50:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 'use strict';
 
 var implementation = require('./implementation');
 
 module.exports = Function.prototype.bind || implementation;
 
-},{"./implementation":49}],51:[function(require,module,exports){
+},{"./implementation":50}],52:[function(require,module,exports){
 var bind = require('function-bind');
 
 module.exports = bind.call(Function.call, Object.prototype.hasOwnProperty);
 
-},{"function-bind":50}],52:[function(require,module,exports){
+},{"function-bind":51}],53:[function(require,module,exports){
 module.exports = {
   XmlEntities: require('./lib/xml-entities.js'),
   Html4Entities: require('./lib/html4-entities.js'),
@@ -5720,7 +5891,7 @@ module.exports = {
   AllHtmlEntities: require('./lib/html5-entities.js')
 };
 
-},{"./lib/html4-entities.js":53,"./lib/html5-entities.js":54,"./lib/xml-entities.js":55}],53:[function(require,module,exports){
+},{"./lib/html4-entities.js":54,"./lib/html5-entities.js":55,"./lib/xml-entities.js":56}],54:[function(require,module,exports){
 var HTML_ALPHA = ['apos', 'nbsp', 'iexcl', 'cent', 'pound', 'curren', 'yen', 'brvbar', 'sect', 'uml', 'copy', 'ordf', 'laquo', 'not', 'shy', 'reg', 'macr', 'deg', 'plusmn', 'sup2', 'sup3', 'acute', 'micro', 'para', 'middot', 'cedil', 'sup1', 'ordm', 'raquo', 'frac14', 'frac12', 'frac34', 'iquest', 'Agrave', 'Aacute', 'Acirc', 'Atilde', 'Auml', 'Aring', 'Aelig', 'Ccedil', 'Egrave', 'Eacute', 'Ecirc', 'Euml', 'Igrave', 'Iacute', 'Icirc', 'Iuml', 'ETH', 'Ntilde', 'Ograve', 'Oacute', 'Ocirc', 'Otilde', 'Ouml', 'times', 'Oslash', 'Ugrave', 'Uacute', 'Ucirc', 'Uuml', 'Yacute', 'THORN', 'szlig', 'agrave', 'aacute', 'acirc', 'atilde', 'auml', 'aring', 'aelig', 'ccedil', 'egrave', 'eacute', 'ecirc', 'euml', 'igrave', 'iacute', 'icirc', 'iuml', 'eth', 'ntilde', 'ograve', 'oacute', 'ocirc', 'otilde', 'ouml', 'divide', 'oslash', 'ugrave', 'uacute', 'ucirc', 'uuml', 'yacute', 'thorn', 'yuml', 'quot', 'amp', 'lt', 'gt', 'OElig', 'oelig', 'Scaron', 'scaron', 'Yuml', 'circ', 'tilde', 'ensp', 'emsp', 'thinsp', 'zwnj', 'zwj', 'lrm', 'rlm', 'ndash', 'mdash', 'lsquo', 'rsquo', 'sbquo', 'ldquo', 'rdquo', 'bdquo', 'dagger', 'Dagger', 'permil', 'lsaquo', 'rsaquo', 'euro', 'fnof', 'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu', 'Nu', 'Xi', 'Omicron', 'Pi', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega', 'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'omicron', 'pi', 'rho', 'sigmaf', 'sigma', 'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega', 'thetasym', 'upsih', 'piv', 'bull', 'hellip', 'prime', 'Prime', 'oline', 'frasl', 'weierp', 'image', 'real', 'trade', 'alefsym', 'larr', 'uarr', 'rarr', 'darr', 'harr', 'crarr', 'lArr', 'uArr', 'rArr', 'dArr', 'hArr', 'forall', 'part', 'exist', 'empty', 'nabla', 'isin', 'notin', 'ni', 'prod', 'sum', 'minus', 'lowast', 'radic', 'prop', 'infin', 'ang', 'and', 'or', 'cap', 'cup', 'int', 'there4', 'sim', 'cong', 'asymp', 'ne', 'equiv', 'le', 'ge', 'sub', 'sup', 'nsub', 'sube', 'supe', 'oplus', 'otimes', 'perp', 'sdot', 'lceil', 'rceil', 'lfloor', 'rfloor', 'lang', 'rang', 'loz', 'spades', 'clubs', 'hearts', 'diams'];
 var HTML_CODES = [39, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 34, 38, 60, 62, 338, 339, 352, 353, 376, 710, 732, 8194, 8195, 8201, 8204, 8205, 8206, 8207, 8211, 8212, 8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8240, 8249, 8250, 8364, 402, 913, 914, 915, 916, 917, 918, 919, 920, 921, 922, 923, 924, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 945, 946, 947, 948, 949, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 977, 978, 982, 8226, 8230, 8242, 8243, 8254, 8260, 8472, 8465, 8476, 8482, 8501, 8592, 8593, 8594, 8595, 8596, 8629, 8656, 8657, 8658, 8659, 8660, 8704, 8706, 8707, 8709, 8711, 8712, 8713, 8715, 8719, 8721, 8722, 8727, 8730, 8733, 8734, 8736, 8743, 8744, 8745, 8746, 8747, 8756, 8764, 8773, 8776, 8800, 8801, 8804, 8805, 8834, 8835, 8836, 8838, 8839, 8853, 8855, 8869, 8901, 8968, 8969, 8970, 8971, 9001, 9002, 9674, 9824, 9827, 9829, 9830];
 
@@ -5869,7 +6040,7 @@ Html4Entities.encodeNonASCII = function(str) {
 
 module.exports = Html4Entities;
 
-},{}],54:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 var ENTITIES = [['Aacute', [193]], ['aacute', [225]], ['Abreve', [258]], ['abreve', [259]], ['ac', [8766]], ['acd', [8767]], ['acE', [8766, 819]], ['Acirc', [194]], ['acirc', [226]], ['acute', [180]], ['Acy', [1040]], ['acy', [1072]], ['AElig', [198]], ['aelig', [230]], ['af', [8289]], ['Afr', [120068]], ['afr', [120094]], ['Agrave', [192]], ['agrave', [224]], ['alefsym', [8501]], ['aleph', [8501]], ['Alpha', [913]], ['alpha', [945]], ['Amacr', [256]], ['amacr', [257]], ['amalg', [10815]], ['amp', [38]], ['AMP', [38]], ['andand', [10837]], ['And', [10835]], ['and', [8743]], ['andd', [10844]], ['andslope', [10840]], ['andv', [10842]], ['ang', [8736]], ['ange', [10660]], ['angle', [8736]], ['angmsdaa', [10664]], ['angmsdab', [10665]], ['angmsdac', [10666]], ['angmsdad', [10667]], ['angmsdae', [10668]], ['angmsdaf', [10669]], ['angmsdag', [10670]], ['angmsdah', [10671]], ['angmsd', [8737]], ['angrt', [8735]], ['angrtvb', [8894]], ['angrtvbd', [10653]], ['angsph', [8738]], ['angst', [197]], ['angzarr', [9084]], ['Aogon', [260]], ['aogon', [261]], ['Aopf', [120120]], ['aopf', [120146]], ['apacir', [10863]], ['ap', [8776]], ['apE', [10864]], ['ape', [8778]], ['apid', [8779]], ['apos', [39]], ['ApplyFunction', [8289]], ['approx', [8776]], ['approxeq', [8778]], ['Aring', [197]], ['aring', [229]], ['Ascr', [119964]], ['ascr', [119990]], ['Assign', [8788]], ['ast', [42]], ['asymp', [8776]], ['asympeq', [8781]], ['Atilde', [195]], ['atilde', [227]], ['Auml', [196]], ['auml', [228]], ['awconint', [8755]], ['awint', [10769]], ['backcong', [8780]], ['backepsilon', [1014]], ['backprime', [8245]], ['backsim', [8765]], ['backsimeq', [8909]], ['Backslash', [8726]], ['Barv', [10983]], ['barvee', [8893]], ['barwed', [8965]], ['Barwed', [8966]], ['barwedge', [8965]], ['bbrk', [9141]], ['bbrktbrk', [9142]], ['bcong', [8780]], ['Bcy', [1041]], ['bcy', [1073]], ['bdquo', [8222]], ['becaus', [8757]], ['because', [8757]], ['Because', [8757]], ['bemptyv', [10672]], ['bepsi', [1014]], ['bernou', [8492]], ['Bernoullis', [8492]], ['Beta', [914]], ['beta', [946]], ['beth', [8502]], ['between', [8812]], ['Bfr', [120069]], ['bfr', [120095]], ['bigcap', [8898]], ['bigcirc', [9711]], ['bigcup', [8899]], ['bigodot', [10752]], ['bigoplus', [10753]], ['bigotimes', [10754]], ['bigsqcup', [10758]], ['bigstar', [9733]], ['bigtriangledown', [9661]], ['bigtriangleup', [9651]], ['biguplus', [10756]], ['bigvee', [8897]], ['bigwedge', [8896]], ['bkarow', [10509]], ['blacklozenge', [10731]], ['blacksquare', [9642]], ['blacktriangle', [9652]], ['blacktriangledown', [9662]], ['blacktriangleleft', [9666]], ['blacktriangleright', [9656]], ['blank', [9251]], ['blk12', [9618]], ['blk14', [9617]], ['blk34', [9619]], ['block', [9608]], ['bne', [61, 8421]], ['bnequiv', [8801, 8421]], ['bNot', [10989]], ['bnot', [8976]], ['Bopf', [120121]], ['bopf', [120147]], ['bot', [8869]], ['bottom', [8869]], ['bowtie', [8904]], ['boxbox', [10697]], ['boxdl', [9488]], ['boxdL', [9557]], ['boxDl', [9558]], ['boxDL', [9559]], ['boxdr', [9484]], ['boxdR', [9554]], ['boxDr', [9555]], ['boxDR', [9556]], ['boxh', [9472]], ['boxH', [9552]], ['boxhd', [9516]], ['boxHd', [9572]], ['boxhD', [9573]], ['boxHD', [9574]], ['boxhu', [9524]], ['boxHu', [9575]], ['boxhU', [9576]], ['boxHU', [9577]], ['boxminus', [8863]], ['boxplus', [8862]], ['boxtimes', [8864]], ['boxul', [9496]], ['boxuL', [9563]], ['boxUl', [9564]], ['boxUL', [9565]], ['boxur', [9492]], ['boxuR', [9560]], ['boxUr', [9561]], ['boxUR', [9562]], ['boxv', [9474]], ['boxV', [9553]], ['boxvh', [9532]], ['boxvH', [9578]], ['boxVh', [9579]], ['boxVH', [9580]], ['boxvl', [9508]], ['boxvL', [9569]], ['boxVl', [9570]], ['boxVL', [9571]], ['boxvr', [9500]], ['boxvR', [9566]], ['boxVr', [9567]], ['boxVR', [9568]], ['bprime', [8245]], ['breve', [728]], ['Breve', [728]], ['brvbar', [166]], ['bscr', [119991]], ['Bscr', [8492]], ['bsemi', [8271]], ['bsim', [8765]], ['bsime', [8909]], ['bsolb', [10693]], ['bsol', [92]], ['bsolhsub', [10184]], ['bull', [8226]], ['bullet', [8226]], ['bump', [8782]], ['bumpE', [10926]], ['bumpe', [8783]], ['Bumpeq', [8782]], ['bumpeq', [8783]], ['Cacute', [262]], ['cacute', [263]], ['capand', [10820]], ['capbrcup', [10825]], ['capcap', [10827]], ['cap', [8745]], ['Cap', [8914]], ['capcup', [10823]], ['capdot', [10816]], ['CapitalDifferentialD', [8517]], ['caps', [8745, 65024]], ['caret', [8257]], ['caron', [711]], ['Cayleys', [8493]], ['ccaps', [10829]], ['Ccaron', [268]], ['ccaron', [269]], ['Ccedil', [199]], ['ccedil', [231]], ['Ccirc', [264]], ['ccirc', [265]], ['Cconint', [8752]], ['ccups', [10828]], ['ccupssm', [10832]], ['Cdot', [266]], ['cdot', [267]], ['cedil', [184]], ['Cedilla', [184]], ['cemptyv', [10674]], ['cent', [162]], ['centerdot', [183]], ['CenterDot', [183]], ['cfr', [120096]], ['Cfr', [8493]], ['CHcy', [1063]], ['chcy', [1095]], ['check', [10003]], ['checkmark', [10003]], ['Chi', [935]], ['chi', [967]], ['circ', [710]], ['circeq', [8791]], ['circlearrowleft', [8634]], ['circlearrowright', [8635]], ['circledast', [8859]], ['circledcirc', [8858]], ['circleddash', [8861]], ['CircleDot', [8857]], ['circledR', [174]], ['circledS', [9416]], ['CircleMinus', [8854]], ['CirclePlus', [8853]], ['CircleTimes', [8855]], ['cir', [9675]], ['cirE', [10691]], ['cire', [8791]], ['cirfnint', [10768]], ['cirmid', [10991]], ['cirscir', [10690]], ['ClockwiseContourIntegral', [8754]], ['clubs', [9827]], ['clubsuit', [9827]], ['colon', [58]], ['Colon', [8759]], ['Colone', [10868]], ['colone', [8788]], ['coloneq', [8788]], ['comma', [44]], ['commat', [64]], ['comp', [8705]], ['compfn', [8728]], ['complement', [8705]], ['complexes', [8450]], ['cong', [8773]], ['congdot', [10861]], ['Congruent', [8801]], ['conint', [8750]], ['Conint', [8751]], ['ContourIntegral', [8750]], ['copf', [120148]], ['Copf', [8450]], ['coprod', [8720]], ['Coproduct', [8720]], ['copy', [169]], ['COPY', [169]], ['copysr', [8471]], ['CounterClockwiseContourIntegral', [8755]], ['crarr', [8629]], ['cross', [10007]], ['Cross', [10799]], ['Cscr', [119966]], ['cscr', [119992]], ['csub', [10959]], ['csube', [10961]], ['csup', [10960]], ['csupe', [10962]], ['ctdot', [8943]], ['cudarrl', [10552]], ['cudarrr', [10549]], ['cuepr', [8926]], ['cuesc', [8927]], ['cularr', [8630]], ['cularrp', [10557]], ['cupbrcap', [10824]], ['cupcap', [10822]], ['CupCap', [8781]], ['cup', [8746]], ['Cup', [8915]], ['cupcup', [10826]], ['cupdot', [8845]], ['cupor', [10821]], ['cups', [8746, 65024]], ['curarr', [8631]], ['curarrm', [10556]], ['curlyeqprec', [8926]], ['curlyeqsucc', [8927]], ['curlyvee', [8910]], ['curlywedge', [8911]], ['curren', [164]], ['curvearrowleft', [8630]], ['curvearrowright', [8631]], ['cuvee', [8910]], ['cuwed', [8911]], ['cwconint', [8754]], ['cwint', [8753]], ['cylcty', [9005]], ['dagger', [8224]], ['Dagger', [8225]], ['daleth', [8504]], ['darr', [8595]], ['Darr', [8609]], ['dArr', [8659]], ['dash', [8208]], ['Dashv', [10980]], ['dashv', [8867]], ['dbkarow', [10511]], ['dblac', [733]], ['Dcaron', [270]], ['dcaron', [271]], ['Dcy', [1044]], ['dcy', [1076]], ['ddagger', [8225]], ['ddarr', [8650]], ['DD', [8517]], ['dd', [8518]], ['DDotrahd', [10513]], ['ddotseq', [10871]], ['deg', [176]], ['Del', [8711]], ['Delta', [916]], ['delta', [948]], ['demptyv', [10673]], ['dfisht', [10623]], ['Dfr', [120071]], ['dfr', [120097]], ['dHar', [10597]], ['dharl', [8643]], ['dharr', [8642]], ['DiacriticalAcute', [180]], ['DiacriticalDot', [729]], ['DiacriticalDoubleAcute', [733]], ['DiacriticalGrave', [96]], ['DiacriticalTilde', [732]], ['diam', [8900]], ['diamond', [8900]], ['Diamond', [8900]], ['diamondsuit', [9830]], ['diams', [9830]], ['die', [168]], ['DifferentialD', [8518]], ['digamma', [989]], ['disin', [8946]], ['div', [247]], ['divide', [247]], ['divideontimes', [8903]], ['divonx', [8903]], ['DJcy', [1026]], ['djcy', [1106]], ['dlcorn', [8990]], ['dlcrop', [8973]], ['dollar', [36]], ['Dopf', [120123]], ['dopf', [120149]], ['Dot', [168]], ['dot', [729]], ['DotDot', [8412]], ['doteq', [8784]], ['doteqdot', [8785]], ['DotEqual', [8784]], ['dotminus', [8760]], ['dotplus', [8724]], ['dotsquare', [8865]], ['doublebarwedge', [8966]], ['DoubleContourIntegral', [8751]], ['DoubleDot', [168]], ['DoubleDownArrow', [8659]], ['DoubleLeftArrow', [8656]], ['DoubleLeftRightArrow', [8660]], ['DoubleLeftTee', [10980]], ['DoubleLongLeftArrow', [10232]], ['DoubleLongLeftRightArrow', [10234]], ['DoubleLongRightArrow', [10233]], ['DoubleRightArrow', [8658]], ['DoubleRightTee', [8872]], ['DoubleUpArrow', [8657]], ['DoubleUpDownArrow', [8661]], ['DoubleVerticalBar', [8741]], ['DownArrowBar', [10515]], ['downarrow', [8595]], ['DownArrow', [8595]], ['Downarrow', [8659]], ['DownArrowUpArrow', [8693]], ['DownBreve', [785]], ['downdownarrows', [8650]], ['downharpoonleft', [8643]], ['downharpoonright', [8642]], ['DownLeftRightVector', [10576]], ['DownLeftTeeVector', [10590]], ['DownLeftVectorBar', [10582]], ['DownLeftVector', [8637]], ['DownRightTeeVector', [10591]], ['DownRightVectorBar', [10583]], ['DownRightVector', [8641]], ['DownTeeArrow', [8615]], ['DownTee', [8868]], ['drbkarow', [10512]], ['drcorn', [8991]], ['drcrop', [8972]], ['Dscr', [119967]], ['dscr', [119993]], ['DScy', [1029]], ['dscy', [1109]], ['dsol', [10742]], ['Dstrok', [272]], ['dstrok', [273]], ['dtdot', [8945]], ['dtri', [9663]], ['dtrif', [9662]], ['duarr', [8693]], ['duhar', [10607]], ['dwangle', [10662]], ['DZcy', [1039]], ['dzcy', [1119]], ['dzigrarr', [10239]], ['Eacute', [201]], ['eacute', [233]], ['easter', [10862]], ['Ecaron', [282]], ['ecaron', [283]], ['Ecirc', [202]], ['ecirc', [234]], ['ecir', [8790]], ['ecolon', [8789]], ['Ecy', [1069]], ['ecy', [1101]], ['eDDot', [10871]], ['Edot', [278]], ['edot', [279]], ['eDot', [8785]], ['ee', [8519]], ['efDot', [8786]], ['Efr', [120072]], ['efr', [120098]], ['eg', [10906]], ['Egrave', [200]], ['egrave', [232]], ['egs', [10902]], ['egsdot', [10904]], ['el', [10905]], ['Element', [8712]], ['elinters', [9191]], ['ell', [8467]], ['els', [10901]], ['elsdot', [10903]], ['Emacr', [274]], ['emacr', [275]], ['empty', [8709]], ['emptyset', [8709]], ['EmptySmallSquare', [9723]], ['emptyv', [8709]], ['EmptyVerySmallSquare', [9643]], ['emsp13', [8196]], ['emsp14', [8197]], ['emsp', [8195]], ['ENG', [330]], ['eng', [331]], ['ensp', [8194]], ['Eogon', [280]], ['eogon', [281]], ['Eopf', [120124]], ['eopf', [120150]], ['epar', [8917]], ['eparsl', [10723]], ['eplus', [10865]], ['epsi', [949]], ['Epsilon', [917]], ['epsilon', [949]], ['epsiv', [1013]], ['eqcirc', [8790]], ['eqcolon', [8789]], ['eqsim', [8770]], ['eqslantgtr', [10902]], ['eqslantless', [10901]], ['Equal', [10869]], ['equals', [61]], ['EqualTilde', [8770]], ['equest', [8799]], ['Equilibrium', [8652]], ['equiv', [8801]], ['equivDD', [10872]], ['eqvparsl', [10725]], ['erarr', [10609]], ['erDot', [8787]], ['escr', [8495]], ['Escr', [8496]], ['esdot', [8784]], ['Esim', [10867]], ['esim', [8770]], ['Eta', [919]], ['eta', [951]], ['ETH', [208]], ['eth', [240]], ['Euml', [203]], ['euml', [235]], ['euro', [8364]], ['excl', [33]], ['exist', [8707]], ['Exists', [8707]], ['expectation', [8496]], ['exponentiale', [8519]], ['ExponentialE', [8519]], ['fallingdotseq', [8786]], ['Fcy', [1060]], ['fcy', [1092]], ['female', [9792]], ['ffilig', [64259]], ['fflig', [64256]], ['ffllig', [64260]], ['Ffr', [120073]], ['ffr', [120099]], ['filig', [64257]], ['FilledSmallSquare', [9724]], ['FilledVerySmallSquare', [9642]], ['fjlig', [102, 106]], ['flat', [9837]], ['fllig', [64258]], ['fltns', [9649]], ['fnof', [402]], ['Fopf', [120125]], ['fopf', [120151]], ['forall', [8704]], ['ForAll', [8704]], ['fork', [8916]], ['forkv', [10969]], ['Fouriertrf', [8497]], ['fpartint', [10765]], ['frac12', [189]], ['frac13', [8531]], ['frac14', [188]], ['frac15', [8533]], ['frac16', [8537]], ['frac18', [8539]], ['frac23', [8532]], ['frac25', [8534]], ['frac34', [190]], ['frac35', [8535]], ['frac38', [8540]], ['frac45', [8536]], ['frac56', [8538]], ['frac58', [8541]], ['frac78', [8542]], ['frasl', [8260]], ['frown', [8994]], ['fscr', [119995]], ['Fscr', [8497]], ['gacute', [501]], ['Gamma', [915]], ['gamma', [947]], ['Gammad', [988]], ['gammad', [989]], ['gap', [10886]], ['Gbreve', [286]], ['gbreve', [287]], ['Gcedil', [290]], ['Gcirc', [284]], ['gcirc', [285]], ['Gcy', [1043]], ['gcy', [1075]], ['Gdot', [288]], ['gdot', [289]], ['ge', [8805]], ['gE', [8807]], ['gEl', [10892]], ['gel', [8923]], ['geq', [8805]], ['geqq', [8807]], ['geqslant', [10878]], ['gescc', [10921]], ['ges', [10878]], ['gesdot', [10880]], ['gesdoto', [10882]], ['gesdotol', [10884]], ['gesl', [8923, 65024]], ['gesles', [10900]], ['Gfr', [120074]], ['gfr', [120100]], ['gg', [8811]], ['Gg', [8921]], ['ggg', [8921]], ['gimel', [8503]], ['GJcy', [1027]], ['gjcy', [1107]], ['gla', [10917]], ['gl', [8823]], ['glE', [10898]], ['glj', [10916]], ['gnap', [10890]], ['gnapprox', [10890]], ['gne', [10888]], ['gnE', [8809]], ['gneq', [10888]], ['gneqq', [8809]], ['gnsim', [8935]], ['Gopf', [120126]], ['gopf', [120152]], ['grave', [96]], ['GreaterEqual', [8805]], ['GreaterEqualLess', [8923]], ['GreaterFullEqual', [8807]], ['GreaterGreater', [10914]], ['GreaterLess', [8823]], ['GreaterSlantEqual', [10878]], ['GreaterTilde', [8819]], ['Gscr', [119970]], ['gscr', [8458]], ['gsim', [8819]], ['gsime', [10894]], ['gsiml', [10896]], ['gtcc', [10919]], ['gtcir', [10874]], ['gt', [62]], ['GT', [62]], ['Gt', [8811]], ['gtdot', [8919]], ['gtlPar', [10645]], ['gtquest', [10876]], ['gtrapprox', [10886]], ['gtrarr', [10616]], ['gtrdot', [8919]], ['gtreqless', [8923]], ['gtreqqless', [10892]], ['gtrless', [8823]], ['gtrsim', [8819]], ['gvertneqq', [8809, 65024]], ['gvnE', [8809, 65024]], ['Hacek', [711]], ['hairsp', [8202]], ['half', [189]], ['hamilt', [8459]], ['HARDcy', [1066]], ['hardcy', [1098]], ['harrcir', [10568]], ['harr', [8596]], ['hArr', [8660]], ['harrw', [8621]], ['Hat', [94]], ['hbar', [8463]], ['Hcirc', [292]], ['hcirc', [293]], ['hearts', [9829]], ['heartsuit', [9829]], ['hellip', [8230]], ['hercon', [8889]], ['hfr', [120101]], ['Hfr', [8460]], ['HilbertSpace', [8459]], ['hksearow', [10533]], ['hkswarow', [10534]], ['hoarr', [8703]], ['homtht', [8763]], ['hookleftarrow', [8617]], ['hookrightarrow', [8618]], ['hopf', [120153]], ['Hopf', [8461]], ['horbar', [8213]], ['HorizontalLine', [9472]], ['hscr', [119997]], ['Hscr', [8459]], ['hslash', [8463]], ['Hstrok', [294]], ['hstrok', [295]], ['HumpDownHump', [8782]], ['HumpEqual', [8783]], ['hybull', [8259]], ['hyphen', [8208]], ['Iacute', [205]], ['iacute', [237]], ['ic', [8291]], ['Icirc', [206]], ['icirc', [238]], ['Icy', [1048]], ['icy', [1080]], ['Idot', [304]], ['IEcy', [1045]], ['iecy', [1077]], ['iexcl', [161]], ['iff', [8660]], ['ifr', [120102]], ['Ifr', [8465]], ['Igrave', [204]], ['igrave', [236]], ['ii', [8520]], ['iiiint', [10764]], ['iiint', [8749]], ['iinfin', [10716]], ['iiota', [8489]], ['IJlig', [306]], ['ijlig', [307]], ['Imacr', [298]], ['imacr', [299]], ['image', [8465]], ['ImaginaryI', [8520]], ['imagline', [8464]], ['imagpart', [8465]], ['imath', [305]], ['Im', [8465]], ['imof', [8887]], ['imped', [437]], ['Implies', [8658]], ['incare', [8453]], ['in', [8712]], ['infin', [8734]], ['infintie', [10717]], ['inodot', [305]], ['intcal', [8890]], ['int', [8747]], ['Int', [8748]], ['integers', [8484]], ['Integral', [8747]], ['intercal', [8890]], ['Intersection', [8898]], ['intlarhk', [10775]], ['intprod', [10812]], ['InvisibleComma', [8291]], ['InvisibleTimes', [8290]], ['IOcy', [1025]], ['iocy', [1105]], ['Iogon', [302]], ['iogon', [303]], ['Iopf', [120128]], ['iopf', [120154]], ['Iota', [921]], ['iota', [953]], ['iprod', [10812]], ['iquest', [191]], ['iscr', [119998]], ['Iscr', [8464]], ['isin', [8712]], ['isindot', [8949]], ['isinE', [8953]], ['isins', [8948]], ['isinsv', [8947]], ['isinv', [8712]], ['it', [8290]], ['Itilde', [296]], ['itilde', [297]], ['Iukcy', [1030]], ['iukcy', [1110]], ['Iuml', [207]], ['iuml', [239]], ['Jcirc', [308]], ['jcirc', [309]], ['Jcy', [1049]], ['jcy', [1081]], ['Jfr', [120077]], ['jfr', [120103]], ['jmath', [567]], ['Jopf', [120129]], ['jopf', [120155]], ['Jscr', [119973]], ['jscr', [119999]], ['Jsercy', [1032]], ['jsercy', [1112]], ['Jukcy', [1028]], ['jukcy', [1108]], ['Kappa', [922]], ['kappa', [954]], ['kappav', [1008]], ['Kcedil', [310]], ['kcedil', [311]], ['Kcy', [1050]], ['kcy', [1082]], ['Kfr', [120078]], ['kfr', [120104]], ['kgreen', [312]], ['KHcy', [1061]], ['khcy', [1093]], ['KJcy', [1036]], ['kjcy', [1116]], ['Kopf', [120130]], ['kopf', [120156]], ['Kscr', [119974]], ['kscr', [120000]], ['lAarr', [8666]], ['Lacute', [313]], ['lacute', [314]], ['laemptyv', [10676]], ['lagran', [8466]], ['Lambda', [923]], ['lambda', [955]], ['lang', [10216]], ['Lang', [10218]], ['langd', [10641]], ['langle', [10216]], ['lap', [10885]], ['Laplacetrf', [8466]], ['laquo', [171]], ['larrb', [8676]], ['larrbfs', [10527]], ['larr', [8592]], ['Larr', [8606]], ['lArr', [8656]], ['larrfs', [10525]], ['larrhk', [8617]], ['larrlp', [8619]], ['larrpl', [10553]], ['larrsim', [10611]], ['larrtl', [8610]], ['latail', [10521]], ['lAtail', [10523]], ['lat', [10923]], ['late', [10925]], ['lates', [10925, 65024]], ['lbarr', [10508]], ['lBarr', [10510]], ['lbbrk', [10098]], ['lbrace', [123]], ['lbrack', [91]], ['lbrke', [10635]], ['lbrksld', [10639]], ['lbrkslu', [10637]], ['Lcaron', [317]], ['lcaron', [318]], ['Lcedil', [315]], ['lcedil', [316]], ['lceil', [8968]], ['lcub', [123]], ['Lcy', [1051]], ['lcy', [1083]], ['ldca', [10550]], ['ldquo', [8220]], ['ldquor', [8222]], ['ldrdhar', [10599]], ['ldrushar', [10571]], ['ldsh', [8626]], ['le', [8804]], ['lE', [8806]], ['LeftAngleBracket', [10216]], ['LeftArrowBar', [8676]], ['leftarrow', [8592]], ['LeftArrow', [8592]], ['Leftarrow', [8656]], ['LeftArrowRightArrow', [8646]], ['leftarrowtail', [8610]], ['LeftCeiling', [8968]], ['LeftDoubleBracket', [10214]], ['LeftDownTeeVector', [10593]], ['LeftDownVectorBar', [10585]], ['LeftDownVector', [8643]], ['LeftFloor', [8970]], ['leftharpoondown', [8637]], ['leftharpoonup', [8636]], ['leftleftarrows', [8647]], ['leftrightarrow', [8596]], ['LeftRightArrow', [8596]], ['Leftrightarrow', [8660]], ['leftrightarrows', [8646]], ['leftrightharpoons', [8651]], ['leftrightsquigarrow', [8621]], ['LeftRightVector', [10574]], ['LeftTeeArrow', [8612]], ['LeftTee', [8867]], ['LeftTeeVector', [10586]], ['leftthreetimes', [8907]], ['LeftTriangleBar', [10703]], ['LeftTriangle', [8882]], ['LeftTriangleEqual', [8884]], ['LeftUpDownVector', [10577]], ['LeftUpTeeVector', [10592]], ['LeftUpVectorBar', [10584]], ['LeftUpVector', [8639]], ['LeftVectorBar', [10578]], ['LeftVector', [8636]], ['lEg', [10891]], ['leg', [8922]], ['leq', [8804]], ['leqq', [8806]], ['leqslant', [10877]], ['lescc', [10920]], ['les', [10877]], ['lesdot', [10879]], ['lesdoto', [10881]], ['lesdotor', [10883]], ['lesg', [8922, 65024]], ['lesges', [10899]], ['lessapprox', [10885]], ['lessdot', [8918]], ['lesseqgtr', [8922]], ['lesseqqgtr', [10891]], ['LessEqualGreater', [8922]], ['LessFullEqual', [8806]], ['LessGreater', [8822]], ['lessgtr', [8822]], ['LessLess', [10913]], ['lesssim', [8818]], ['LessSlantEqual', [10877]], ['LessTilde', [8818]], ['lfisht', [10620]], ['lfloor', [8970]], ['Lfr', [120079]], ['lfr', [120105]], ['lg', [8822]], ['lgE', [10897]], ['lHar', [10594]], ['lhard', [8637]], ['lharu', [8636]], ['lharul', [10602]], ['lhblk', [9604]], ['LJcy', [1033]], ['ljcy', [1113]], ['llarr', [8647]], ['ll', [8810]], ['Ll', [8920]], ['llcorner', [8990]], ['Lleftarrow', [8666]], ['llhard', [10603]], ['lltri', [9722]], ['Lmidot', [319]], ['lmidot', [320]], ['lmoustache', [9136]], ['lmoust', [9136]], ['lnap', [10889]], ['lnapprox', [10889]], ['lne', [10887]], ['lnE', [8808]], ['lneq', [10887]], ['lneqq', [8808]], ['lnsim', [8934]], ['loang', [10220]], ['loarr', [8701]], ['lobrk', [10214]], ['longleftarrow', [10229]], ['LongLeftArrow', [10229]], ['Longleftarrow', [10232]], ['longleftrightarrow', [10231]], ['LongLeftRightArrow', [10231]], ['Longleftrightarrow', [10234]], ['longmapsto', [10236]], ['longrightarrow', [10230]], ['LongRightArrow', [10230]], ['Longrightarrow', [10233]], ['looparrowleft', [8619]], ['looparrowright', [8620]], ['lopar', [10629]], ['Lopf', [120131]], ['lopf', [120157]], ['loplus', [10797]], ['lotimes', [10804]], ['lowast', [8727]], ['lowbar', [95]], ['LowerLeftArrow', [8601]], ['LowerRightArrow', [8600]], ['loz', [9674]], ['lozenge', [9674]], ['lozf', [10731]], ['lpar', [40]], ['lparlt', [10643]], ['lrarr', [8646]], ['lrcorner', [8991]], ['lrhar', [8651]], ['lrhard', [10605]], ['lrm', [8206]], ['lrtri', [8895]], ['lsaquo', [8249]], ['lscr', [120001]], ['Lscr', [8466]], ['lsh', [8624]], ['Lsh', [8624]], ['lsim', [8818]], ['lsime', [10893]], ['lsimg', [10895]], ['lsqb', [91]], ['lsquo', [8216]], ['lsquor', [8218]], ['Lstrok', [321]], ['lstrok', [322]], ['ltcc', [10918]], ['ltcir', [10873]], ['lt', [60]], ['LT', [60]], ['Lt', [8810]], ['ltdot', [8918]], ['lthree', [8907]], ['ltimes', [8905]], ['ltlarr', [10614]], ['ltquest', [10875]], ['ltri', [9667]], ['ltrie', [8884]], ['ltrif', [9666]], ['ltrPar', [10646]], ['lurdshar', [10570]], ['luruhar', [10598]], ['lvertneqq', [8808, 65024]], ['lvnE', [8808, 65024]], ['macr', [175]], ['male', [9794]], ['malt', [10016]], ['maltese', [10016]], ['Map', [10501]], ['map', [8614]], ['mapsto', [8614]], ['mapstodown', [8615]], ['mapstoleft', [8612]], ['mapstoup', [8613]], ['marker', [9646]], ['mcomma', [10793]], ['Mcy', [1052]], ['mcy', [1084]], ['mdash', [8212]], ['mDDot', [8762]], ['measuredangle', [8737]], ['MediumSpace', [8287]], ['Mellintrf', [8499]], ['Mfr', [120080]], ['mfr', [120106]], ['mho', [8487]], ['micro', [181]], ['midast', [42]], ['midcir', [10992]], ['mid', [8739]], ['middot', [183]], ['minusb', [8863]], ['minus', [8722]], ['minusd', [8760]], ['minusdu', [10794]], ['MinusPlus', [8723]], ['mlcp', [10971]], ['mldr', [8230]], ['mnplus', [8723]], ['models', [8871]], ['Mopf', [120132]], ['mopf', [120158]], ['mp', [8723]], ['mscr', [120002]], ['Mscr', [8499]], ['mstpos', [8766]], ['Mu', [924]], ['mu', [956]], ['multimap', [8888]], ['mumap', [8888]], ['nabla', [8711]], ['Nacute', [323]], ['nacute', [324]], ['nang', [8736, 8402]], ['nap', [8777]], ['napE', [10864, 824]], ['napid', [8779, 824]], ['napos', [329]], ['napprox', [8777]], ['natural', [9838]], ['naturals', [8469]], ['natur', [9838]], ['nbsp', [160]], ['nbump', [8782, 824]], ['nbumpe', [8783, 824]], ['ncap', [10819]], ['Ncaron', [327]], ['ncaron', [328]], ['Ncedil', [325]], ['ncedil', [326]], ['ncong', [8775]], ['ncongdot', [10861, 824]], ['ncup', [10818]], ['Ncy', [1053]], ['ncy', [1085]], ['ndash', [8211]], ['nearhk', [10532]], ['nearr', [8599]], ['neArr', [8663]], ['nearrow', [8599]], ['ne', [8800]], ['nedot', [8784, 824]], ['NegativeMediumSpace', [8203]], ['NegativeThickSpace', [8203]], ['NegativeThinSpace', [8203]], ['NegativeVeryThinSpace', [8203]], ['nequiv', [8802]], ['nesear', [10536]], ['nesim', [8770, 824]], ['NestedGreaterGreater', [8811]], ['NestedLessLess', [8810]], ['nexist', [8708]], ['nexists', [8708]], ['Nfr', [120081]], ['nfr', [120107]], ['ngE', [8807, 824]], ['nge', [8817]], ['ngeq', [8817]], ['ngeqq', [8807, 824]], ['ngeqslant', [10878, 824]], ['nges', [10878, 824]], ['nGg', [8921, 824]], ['ngsim', [8821]], ['nGt', [8811, 8402]], ['ngt', [8815]], ['ngtr', [8815]], ['nGtv', [8811, 824]], ['nharr', [8622]], ['nhArr', [8654]], ['nhpar', [10994]], ['ni', [8715]], ['nis', [8956]], ['nisd', [8954]], ['niv', [8715]], ['NJcy', [1034]], ['njcy', [1114]], ['nlarr', [8602]], ['nlArr', [8653]], ['nldr', [8229]], ['nlE', [8806, 824]], ['nle', [8816]], ['nleftarrow', [8602]], ['nLeftarrow', [8653]], ['nleftrightarrow', [8622]], ['nLeftrightarrow', [8654]], ['nleq', [8816]], ['nleqq', [8806, 824]], ['nleqslant', [10877, 824]], ['nles', [10877, 824]], ['nless', [8814]], ['nLl', [8920, 824]], ['nlsim', [8820]], ['nLt', [8810, 8402]], ['nlt', [8814]], ['nltri', [8938]], ['nltrie', [8940]], ['nLtv', [8810, 824]], ['nmid', [8740]], ['NoBreak', [8288]], ['NonBreakingSpace', [160]], ['nopf', [120159]], ['Nopf', [8469]], ['Not', [10988]], ['not', [172]], ['NotCongruent', [8802]], ['NotCupCap', [8813]], ['NotDoubleVerticalBar', [8742]], ['NotElement', [8713]], ['NotEqual', [8800]], ['NotEqualTilde', [8770, 824]], ['NotExists', [8708]], ['NotGreater', [8815]], ['NotGreaterEqual', [8817]], ['NotGreaterFullEqual', [8807, 824]], ['NotGreaterGreater', [8811, 824]], ['NotGreaterLess', [8825]], ['NotGreaterSlantEqual', [10878, 824]], ['NotGreaterTilde', [8821]], ['NotHumpDownHump', [8782, 824]], ['NotHumpEqual', [8783, 824]], ['notin', [8713]], ['notindot', [8949, 824]], ['notinE', [8953, 824]], ['notinva', [8713]], ['notinvb', [8951]], ['notinvc', [8950]], ['NotLeftTriangleBar', [10703, 824]], ['NotLeftTriangle', [8938]], ['NotLeftTriangleEqual', [8940]], ['NotLess', [8814]], ['NotLessEqual', [8816]], ['NotLessGreater', [8824]], ['NotLessLess', [8810, 824]], ['NotLessSlantEqual', [10877, 824]], ['NotLessTilde', [8820]], ['NotNestedGreaterGreater', [10914, 824]], ['NotNestedLessLess', [10913, 824]], ['notni', [8716]], ['notniva', [8716]], ['notnivb', [8958]], ['notnivc', [8957]], ['NotPrecedes', [8832]], ['NotPrecedesEqual', [10927, 824]], ['NotPrecedesSlantEqual', [8928]], ['NotReverseElement', [8716]], ['NotRightTriangleBar', [10704, 824]], ['NotRightTriangle', [8939]], ['NotRightTriangleEqual', [8941]], ['NotSquareSubset', [8847, 824]], ['NotSquareSubsetEqual', [8930]], ['NotSquareSuperset', [8848, 824]], ['NotSquareSupersetEqual', [8931]], ['NotSubset', [8834, 8402]], ['NotSubsetEqual', [8840]], ['NotSucceeds', [8833]], ['NotSucceedsEqual', [10928, 824]], ['NotSucceedsSlantEqual', [8929]], ['NotSucceedsTilde', [8831, 824]], ['NotSuperset', [8835, 8402]], ['NotSupersetEqual', [8841]], ['NotTilde', [8769]], ['NotTildeEqual', [8772]], ['NotTildeFullEqual', [8775]], ['NotTildeTilde', [8777]], ['NotVerticalBar', [8740]], ['nparallel', [8742]], ['npar', [8742]], ['nparsl', [11005, 8421]], ['npart', [8706, 824]], ['npolint', [10772]], ['npr', [8832]], ['nprcue', [8928]], ['nprec', [8832]], ['npreceq', [10927, 824]], ['npre', [10927, 824]], ['nrarrc', [10547, 824]], ['nrarr', [8603]], ['nrArr', [8655]], ['nrarrw', [8605, 824]], ['nrightarrow', [8603]], ['nRightarrow', [8655]], ['nrtri', [8939]], ['nrtrie', [8941]], ['nsc', [8833]], ['nsccue', [8929]], ['nsce', [10928, 824]], ['Nscr', [119977]], ['nscr', [120003]], ['nshortmid', [8740]], ['nshortparallel', [8742]], ['nsim', [8769]], ['nsime', [8772]], ['nsimeq', [8772]], ['nsmid', [8740]], ['nspar', [8742]], ['nsqsube', [8930]], ['nsqsupe', [8931]], ['nsub', [8836]], ['nsubE', [10949, 824]], ['nsube', [8840]], ['nsubset', [8834, 8402]], ['nsubseteq', [8840]], ['nsubseteqq', [10949, 824]], ['nsucc', [8833]], ['nsucceq', [10928, 824]], ['nsup', [8837]], ['nsupE', [10950, 824]], ['nsupe', [8841]], ['nsupset', [8835, 8402]], ['nsupseteq', [8841]], ['nsupseteqq', [10950, 824]], ['ntgl', [8825]], ['Ntilde', [209]], ['ntilde', [241]], ['ntlg', [8824]], ['ntriangleleft', [8938]], ['ntrianglelefteq', [8940]], ['ntriangleright', [8939]], ['ntrianglerighteq', [8941]], ['Nu', [925]], ['nu', [957]], ['num', [35]], ['numero', [8470]], ['numsp', [8199]], ['nvap', [8781, 8402]], ['nvdash', [8876]], ['nvDash', [8877]], ['nVdash', [8878]], ['nVDash', [8879]], ['nvge', [8805, 8402]], ['nvgt', [62, 8402]], ['nvHarr', [10500]], ['nvinfin', [10718]], ['nvlArr', [10498]], ['nvle', [8804, 8402]], ['nvlt', [60, 8402]], ['nvltrie', [8884, 8402]], ['nvrArr', [10499]], ['nvrtrie', [8885, 8402]], ['nvsim', [8764, 8402]], ['nwarhk', [10531]], ['nwarr', [8598]], ['nwArr', [8662]], ['nwarrow', [8598]], ['nwnear', [10535]], ['Oacute', [211]], ['oacute', [243]], ['oast', [8859]], ['Ocirc', [212]], ['ocirc', [244]], ['ocir', [8858]], ['Ocy', [1054]], ['ocy', [1086]], ['odash', [8861]], ['Odblac', [336]], ['odblac', [337]], ['odiv', [10808]], ['odot', [8857]], ['odsold', [10684]], ['OElig', [338]], ['oelig', [339]], ['ofcir', [10687]], ['Ofr', [120082]], ['ofr', [120108]], ['ogon', [731]], ['Ograve', [210]], ['ograve', [242]], ['ogt', [10689]], ['ohbar', [10677]], ['ohm', [937]], ['oint', [8750]], ['olarr', [8634]], ['olcir', [10686]], ['olcross', [10683]], ['oline', [8254]], ['olt', [10688]], ['Omacr', [332]], ['omacr', [333]], ['Omega', [937]], ['omega', [969]], ['Omicron', [927]], ['omicron', [959]], ['omid', [10678]], ['ominus', [8854]], ['Oopf', [120134]], ['oopf', [120160]], ['opar', [10679]], ['OpenCurlyDoubleQuote', [8220]], ['OpenCurlyQuote', [8216]], ['operp', [10681]], ['oplus', [8853]], ['orarr', [8635]], ['Or', [10836]], ['or', [8744]], ['ord', [10845]], ['order', [8500]], ['orderof', [8500]], ['ordf', [170]], ['ordm', [186]], ['origof', [8886]], ['oror', [10838]], ['orslope', [10839]], ['orv', [10843]], ['oS', [9416]], ['Oscr', [119978]], ['oscr', [8500]], ['Oslash', [216]], ['oslash', [248]], ['osol', [8856]], ['Otilde', [213]], ['otilde', [245]], ['otimesas', [10806]], ['Otimes', [10807]], ['otimes', [8855]], ['Ouml', [214]], ['ouml', [246]], ['ovbar', [9021]], ['OverBar', [8254]], ['OverBrace', [9182]], ['OverBracket', [9140]], ['OverParenthesis', [9180]], ['para', [182]], ['parallel', [8741]], ['par', [8741]], ['parsim', [10995]], ['parsl', [11005]], ['part', [8706]], ['PartialD', [8706]], ['Pcy', [1055]], ['pcy', [1087]], ['percnt', [37]], ['period', [46]], ['permil', [8240]], ['perp', [8869]], ['pertenk', [8241]], ['Pfr', [120083]], ['pfr', [120109]], ['Phi', [934]], ['phi', [966]], ['phiv', [981]], ['phmmat', [8499]], ['phone', [9742]], ['Pi', [928]], ['pi', [960]], ['pitchfork', [8916]], ['piv', [982]], ['planck', [8463]], ['planckh', [8462]], ['plankv', [8463]], ['plusacir', [10787]], ['plusb', [8862]], ['pluscir', [10786]], ['plus', [43]], ['plusdo', [8724]], ['plusdu', [10789]], ['pluse', [10866]], ['PlusMinus', [177]], ['plusmn', [177]], ['plussim', [10790]], ['plustwo', [10791]], ['pm', [177]], ['Poincareplane', [8460]], ['pointint', [10773]], ['popf', [120161]], ['Popf', [8473]], ['pound', [163]], ['prap', [10935]], ['Pr', [10939]], ['pr', [8826]], ['prcue', [8828]], ['precapprox', [10935]], ['prec', [8826]], ['preccurlyeq', [8828]], ['Precedes', [8826]], ['PrecedesEqual', [10927]], ['PrecedesSlantEqual', [8828]], ['PrecedesTilde', [8830]], ['preceq', [10927]], ['precnapprox', [10937]], ['precneqq', [10933]], ['precnsim', [8936]], ['pre', [10927]], ['prE', [10931]], ['precsim', [8830]], ['prime', [8242]], ['Prime', [8243]], ['primes', [8473]], ['prnap', [10937]], ['prnE', [10933]], ['prnsim', [8936]], ['prod', [8719]], ['Product', [8719]], ['profalar', [9006]], ['profline', [8978]], ['profsurf', [8979]], ['prop', [8733]], ['Proportional', [8733]], ['Proportion', [8759]], ['propto', [8733]], ['prsim', [8830]], ['prurel', [8880]], ['Pscr', [119979]], ['pscr', [120005]], ['Psi', [936]], ['psi', [968]], ['puncsp', [8200]], ['Qfr', [120084]], ['qfr', [120110]], ['qint', [10764]], ['qopf', [120162]], ['Qopf', [8474]], ['qprime', [8279]], ['Qscr', [119980]], ['qscr', [120006]], ['quaternions', [8461]], ['quatint', [10774]], ['quest', [63]], ['questeq', [8799]], ['quot', [34]], ['QUOT', [34]], ['rAarr', [8667]], ['race', [8765, 817]], ['Racute', [340]], ['racute', [341]], ['radic', [8730]], ['raemptyv', [10675]], ['rang', [10217]], ['Rang', [10219]], ['rangd', [10642]], ['range', [10661]], ['rangle', [10217]], ['raquo', [187]], ['rarrap', [10613]], ['rarrb', [8677]], ['rarrbfs', [10528]], ['rarrc', [10547]], ['rarr', [8594]], ['Rarr', [8608]], ['rArr', [8658]], ['rarrfs', [10526]], ['rarrhk', [8618]], ['rarrlp', [8620]], ['rarrpl', [10565]], ['rarrsim', [10612]], ['Rarrtl', [10518]], ['rarrtl', [8611]], ['rarrw', [8605]], ['ratail', [10522]], ['rAtail', [10524]], ['ratio', [8758]], ['rationals', [8474]], ['rbarr', [10509]], ['rBarr', [10511]], ['RBarr', [10512]], ['rbbrk', [10099]], ['rbrace', [125]], ['rbrack', [93]], ['rbrke', [10636]], ['rbrksld', [10638]], ['rbrkslu', [10640]], ['Rcaron', [344]], ['rcaron', [345]], ['Rcedil', [342]], ['rcedil', [343]], ['rceil', [8969]], ['rcub', [125]], ['Rcy', [1056]], ['rcy', [1088]], ['rdca', [10551]], ['rdldhar', [10601]], ['rdquo', [8221]], ['rdquor', [8221]], ['CloseCurlyDoubleQuote', [8221]], ['rdsh', [8627]], ['real', [8476]], ['realine', [8475]], ['realpart', [8476]], ['reals', [8477]], ['Re', [8476]], ['rect', [9645]], ['reg', [174]], ['REG', [174]], ['ReverseElement', [8715]], ['ReverseEquilibrium', [8651]], ['ReverseUpEquilibrium', [10607]], ['rfisht', [10621]], ['rfloor', [8971]], ['rfr', [120111]], ['Rfr', [8476]], ['rHar', [10596]], ['rhard', [8641]], ['rharu', [8640]], ['rharul', [10604]], ['Rho', [929]], ['rho', [961]], ['rhov', [1009]], ['RightAngleBracket', [10217]], ['RightArrowBar', [8677]], ['rightarrow', [8594]], ['RightArrow', [8594]], ['Rightarrow', [8658]], ['RightArrowLeftArrow', [8644]], ['rightarrowtail', [8611]], ['RightCeiling', [8969]], ['RightDoubleBracket', [10215]], ['RightDownTeeVector', [10589]], ['RightDownVectorBar', [10581]], ['RightDownVector', [8642]], ['RightFloor', [8971]], ['rightharpoondown', [8641]], ['rightharpoonup', [8640]], ['rightleftarrows', [8644]], ['rightleftharpoons', [8652]], ['rightrightarrows', [8649]], ['rightsquigarrow', [8605]], ['RightTeeArrow', [8614]], ['RightTee', [8866]], ['RightTeeVector', [10587]], ['rightthreetimes', [8908]], ['RightTriangleBar', [10704]], ['RightTriangle', [8883]], ['RightTriangleEqual', [8885]], ['RightUpDownVector', [10575]], ['RightUpTeeVector', [10588]], ['RightUpVectorBar', [10580]], ['RightUpVector', [8638]], ['RightVectorBar', [10579]], ['RightVector', [8640]], ['ring', [730]], ['risingdotseq', [8787]], ['rlarr', [8644]], ['rlhar', [8652]], ['rlm', [8207]], ['rmoustache', [9137]], ['rmoust', [9137]], ['rnmid', [10990]], ['roang', [10221]], ['roarr', [8702]], ['robrk', [10215]], ['ropar', [10630]], ['ropf', [120163]], ['Ropf', [8477]], ['roplus', [10798]], ['rotimes', [10805]], ['RoundImplies', [10608]], ['rpar', [41]], ['rpargt', [10644]], ['rppolint', [10770]], ['rrarr', [8649]], ['Rrightarrow', [8667]], ['rsaquo', [8250]], ['rscr', [120007]], ['Rscr', [8475]], ['rsh', [8625]], ['Rsh', [8625]], ['rsqb', [93]], ['rsquo', [8217]], ['rsquor', [8217]], ['CloseCurlyQuote', [8217]], ['rthree', [8908]], ['rtimes', [8906]], ['rtri', [9657]], ['rtrie', [8885]], ['rtrif', [9656]], ['rtriltri', [10702]], ['RuleDelayed', [10740]], ['ruluhar', [10600]], ['rx', [8478]], ['Sacute', [346]], ['sacute', [347]], ['sbquo', [8218]], ['scap', [10936]], ['Scaron', [352]], ['scaron', [353]], ['Sc', [10940]], ['sc', [8827]], ['sccue', [8829]], ['sce', [10928]], ['scE', [10932]], ['Scedil', [350]], ['scedil', [351]], ['Scirc', [348]], ['scirc', [349]], ['scnap', [10938]], ['scnE', [10934]], ['scnsim', [8937]], ['scpolint', [10771]], ['scsim', [8831]], ['Scy', [1057]], ['scy', [1089]], ['sdotb', [8865]], ['sdot', [8901]], ['sdote', [10854]], ['searhk', [10533]], ['searr', [8600]], ['seArr', [8664]], ['searrow', [8600]], ['sect', [167]], ['semi', [59]], ['seswar', [10537]], ['setminus', [8726]], ['setmn', [8726]], ['sext', [10038]], ['Sfr', [120086]], ['sfr', [120112]], ['sfrown', [8994]], ['sharp', [9839]], ['SHCHcy', [1065]], ['shchcy', [1097]], ['SHcy', [1064]], ['shcy', [1096]], ['ShortDownArrow', [8595]], ['ShortLeftArrow', [8592]], ['shortmid', [8739]], ['shortparallel', [8741]], ['ShortRightArrow', [8594]], ['ShortUpArrow', [8593]], ['shy', [173]], ['Sigma', [931]], ['sigma', [963]], ['sigmaf', [962]], ['sigmav', [962]], ['sim', [8764]], ['simdot', [10858]], ['sime', [8771]], ['simeq', [8771]], ['simg', [10910]], ['simgE', [10912]], ['siml', [10909]], ['simlE', [10911]], ['simne', [8774]], ['simplus', [10788]], ['simrarr', [10610]], ['slarr', [8592]], ['SmallCircle', [8728]], ['smallsetminus', [8726]], ['smashp', [10803]], ['smeparsl', [10724]], ['smid', [8739]], ['smile', [8995]], ['smt', [10922]], ['smte', [10924]], ['smtes', [10924, 65024]], ['SOFTcy', [1068]], ['softcy', [1100]], ['solbar', [9023]], ['solb', [10692]], ['sol', [47]], ['Sopf', [120138]], ['sopf', [120164]], ['spades', [9824]], ['spadesuit', [9824]], ['spar', [8741]], ['sqcap', [8851]], ['sqcaps', [8851, 65024]], ['sqcup', [8852]], ['sqcups', [8852, 65024]], ['Sqrt', [8730]], ['sqsub', [8847]], ['sqsube', [8849]], ['sqsubset', [8847]], ['sqsubseteq', [8849]], ['sqsup', [8848]], ['sqsupe', [8850]], ['sqsupset', [8848]], ['sqsupseteq', [8850]], ['square', [9633]], ['Square', [9633]], ['SquareIntersection', [8851]], ['SquareSubset', [8847]], ['SquareSubsetEqual', [8849]], ['SquareSuperset', [8848]], ['SquareSupersetEqual', [8850]], ['SquareUnion', [8852]], ['squarf', [9642]], ['squ', [9633]], ['squf', [9642]], ['srarr', [8594]], ['Sscr', [119982]], ['sscr', [120008]], ['ssetmn', [8726]], ['ssmile', [8995]], ['sstarf', [8902]], ['Star', [8902]], ['star', [9734]], ['starf', [9733]], ['straightepsilon', [1013]], ['straightphi', [981]], ['strns', [175]], ['sub', [8834]], ['Sub', [8912]], ['subdot', [10941]], ['subE', [10949]], ['sube', [8838]], ['subedot', [10947]], ['submult', [10945]], ['subnE', [10955]], ['subne', [8842]], ['subplus', [10943]], ['subrarr', [10617]], ['subset', [8834]], ['Subset', [8912]], ['subseteq', [8838]], ['subseteqq', [10949]], ['SubsetEqual', [8838]], ['subsetneq', [8842]], ['subsetneqq', [10955]], ['subsim', [10951]], ['subsub', [10965]], ['subsup', [10963]], ['succapprox', [10936]], ['succ', [8827]], ['succcurlyeq', [8829]], ['Succeeds', [8827]], ['SucceedsEqual', [10928]], ['SucceedsSlantEqual', [8829]], ['SucceedsTilde', [8831]], ['succeq', [10928]], ['succnapprox', [10938]], ['succneqq', [10934]], ['succnsim', [8937]], ['succsim', [8831]], ['SuchThat', [8715]], ['sum', [8721]], ['Sum', [8721]], ['sung', [9834]], ['sup1', [185]], ['sup2', [178]], ['sup3', [179]], ['sup', [8835]], ['Sup', [8913]], ['supdot', [10942]], ['supdsub', [10968]], ['supE', [10950]], ['supe', [8839]], ['supedot', [10948]], ['Superset', [8835]], ['SupersetEqual', [8839]], ['suphsol', [10185]], ['suphsub', [10967]], ['suplarr', [10619]], ['supmult', [10946]], ['supnE', [10956]], ['supne', [8843]], ['supplus', [10944]], ['supset', [8835]], ['Supset', [8913]], ['supseteq', [8839]], ['supseteqq', [10950]], ['supsetneq', [8843]], ['supsetneqq', [10956]], ['supsim', [10952]], ['supsub', [10964]], ['supsup', [10966]], ['swarhk', [10534]], ['swarr', [8601]], ['swArr', [8665]], ['swarrow', [8601]], ['swnwar', [10538]], ['szlig', [223]], ['Tab', [9]], ['target', [8982]], ['Tau', [932]], ['tau', [964]], ['tbrk', [9140]], ['Tcaron', [356]], ['tcaron', [357]], ['Tcedil', [354]], ['tcedil', [355]], ['Tcy', [1058]], ['tcy', [1090]], ['tdot', [8411]], ['telrec', [8981]], ['Tfr', [120087]], ['tfr', [120113]], ['there4', [8756]], ['therefore', [8756]], ['Therefore', [8756]], ['Theta', [920]], ['theta', [952]], ['thetasym', [977]], ['thetav', [977]], ['thickapprox', [8776]], ['thicksim', [8764]], ['ThickSpace', [8287, 8202]], ['ThinSpace', [8201]], ['thinsp', [8201]], ['thkap', [8776]], ['thksim', [8764]], ['THORN', [222]], ['thorn', [254]], ['tilde', [732]], ['Tilde', [8764]], ['TildeEqual', [8771]], ['TildeFullEqual', [8773]], ['TildeTilde', [8776]], ['timesbar', [10801]], ['timesb', [8864]], ['times', [215]], ['timesd', [10800]], ['tint', [8749]], ['toea', [10536]], ['topbot', [9014]], ['topcir', [10993]], ['top', [8868]], ['Topf', [120139]], ['topf', [120165]], ['topfork', [10970]], ['tosa', [10537]], ['tprime', [8244]], ['trade', [8482]], ['TRADE', [8482]], ['triangle', [9653]], ['triangledown', [9663]], ['triangleleft', [9667]], ['trianglelefteq', [8884]], ['triangleq', [8796]], ['triangleright', [9657]], ['trianglerighteq', [8885]], ['tridot', [9708]], ['trie', [8796]], ['triminus', [10810]], ['TripleDot', [8411]], ['triplus', [10809]], ['trisb', [10701]], ['tritime', [10811]], ['trpezium', [9186]], ['Tscr', [119983]], ['tscr', [120009]], ['TScy', [1062]], ['tscy', [1094]], ['TSHcy', [1035]], ['tshcy', [1115]], ['Tstrok', [358]], ['tstrok', [359]], ['twixt', [8812]], ['twoheadleftarrow', [8606]], ['twoheadrightarrow', [8608]], ['Uacute', [218]], ['uacute', [250]], ['uarr', [8593]], ['Uarr', [8607]], ['uArr', [8657]], ['Uarrocir', [10569]], ['Ubrcy', [1038]], ['ubrcy', [1118]], ['Ubreve', [364]], ['ubreve', [365]], ['Ucirc', [219]], ['ucirc', [251]], ['Ucy', [1059]], ['ucy', [1091]], ['udarr', [8645]], ['Udblac', [368]], ['udblac', [369]], ['udhar', [10606]], ['ufisht', [10622]], ['Ufr', [120088]], ['ufr', [120114]], ['Ugrave', [217]], ['ugrave', [249]], ['uHar', [10595]], ['uharl', [8639]], ['uharr', [8638]], ['uhblk', [9600]], ['ulcorn', [8988]], ['ulcorner', [8988]], ['ulcrop', [8975]], ['ultri', [9720]], ['Umacr', [362]], ['umacr', [363]], ['uml', [168]], ['UnderBar', [95]], ['UnderBrace', [9183]], ['UnderBracket', [9141]], ['UnderParenthesis', [9181]], ['Union', [8899]], ['UnionPlus', [8846]], ['Uogon', [370]], ['uogon', [371]], ['Uopf', [120140]], ['uopf', [120166]], ['UpArrowBar', [10514]], ['uparrow', [8593]], ['UpArrow', [8593]], ['Uparrow', [8657]], ['UpArrowDownArrow', [8645]], ['updownarrow', [8597]], ['UpDownArrow', [8597]], ['Updownarrow', [8661]], ['UpEquilibrium', [10606]], ['upharpoonleft', [8639]], ['upharpoonright', [8638]], ['uplus', [8846]], ['UpperLeftArrow', [8598]], ['UpperRightArrow', [8599]], ['upsi', [965]], ['Upsi', [978]], ['upsih', [978]], ['Upsilon', [933]], ['upsilon', [965]], ['UpTeeArrow', [8613]], ['UpTee', [8869]], ['upuparrows', [8648]], ['urcorn', [8989]], ['urcorner', [8989]], ['urcrop', [8974]], ['Uring', [366]], ['uring', [367]], ['urtri', [9721]], ['Uscr', [119984]], ['uscr', [120010]], ['utdot', [8944]], ['Utilde', [360]], ['utilde', [361]], ['utri', [9653]], ['utrif', [9652]], ['uuarr', [8648]], ['Uuml', [220]], ['uuml', [252]], ['uwangle', [10663]], ['vangrt', [10652]], ['varepsilon', [1013]], ['varkappa', [1008]], ['varnothing', [8709]], ['varphi', [981]], ['varpi', [982]], ['varpropto', [8733]], ['varr', [8597]], ['vArr', [8661]], ['varrho', [1009]], ['varsigma', [962]], ['varsubsetneq', [8842, 65024]], ['varsubsetneqq', [10955, 65024]], ['varsupsetneq', [8843, 65024]], ['varsupsetneqq', [10956, 65024]], ['vartheta', [977]], ['vartriangleleft', [8882]], ['vartriangleright', [8883]], ['vBar', [10984]], ['Vbar', [10987]], ['vBarv', [10985]], ['Vcy', [1042]], ['vcy', [1074]], ['vdash', [8866]], ['vDash', [8872]], ['Vdash', [8873]], ['VDash', [8875]], ['Vdashl', [10982]], ['veebar', [8891]], ['vee', [8744]], ['Vee', [8897]], ['veeeq', [8794]], ['vellip', [8942]], ['verbar', [124]], ['Verbar', [8214]], ['vert', [124]], ['Vert', [8214]], ['VerticalBar', [8739]], ['VerticalLine', [124]], ['VerticalSeparator', [10072]], ['VerticalTilde', [8768]], ['VeryThinSpace', [8202]], ['Vfr', [120089]], ['vfr', [120115]], ['vltri', [8882]], ['vnsub', [8834, 8402]], ['vnsup', [8835, 8402]], ['Vopf', [120141]], ['vopf', [120167]], ['vprop', [8733]], ['vrtri', [8883]], ['Vscr', [119985]], ['vscr', [120011]], ['vsubnE', [10955, 65024]], ['vsubne', [8842, 65024]], ['vsupnE', [10956, 65024]], ['vsupne', [8843, 65024]], ['Vvdash', [8874]], ['vzigzag', [10650]], ['Wcirc', [372]], ['wcirc', [373]], ['wedbar', [10847]], ['wedge', [8743]], ['Wedge', [8896]], ['wedgeq', [8793]], ['weierp', [8472]], ['Wfr', [120090]], ['wfr', [120116]], ['Wopf', [120142]], ['wopf', [120168]], ['wp', [8472]], ['wr', [8768]], ['wreath', [8768]], ['Wscr', [119986]], ['wscr', [120012]], ['xcap', [8898]], ['xcirc', [9711]], ['xcup', [8899]], ['xdtri', [9661]], ['Xfr', [120091]], ['xfr', [120117]], ['xharr', [10231]], ['xhArr', [10234]], ['Xi', [926]], ['xi', [958]], ['xlarr', [10229]], ['xlArr', [10232]], ['xmap', [10236]], ['xnis', [8955]], ['xodot', [10752]], ['Xopf', [120143]], ['xopf', [120169]], ['xoplus', [10753]], ['xotime', [10754]], ['xrarr', [10230]], ['xrArr', [10233]], ['Xscr', [119987]], ['xscr', [120013]], ['xsqcup', [10758]], ['xuplus', [10756]], ['xutri', [9651]], ['xvee', [8897]], ['xwedge', [8896]], ['Yacute', [221]], ['yacute', [253]], ['YAcy', [1071]], ['yacy', [1103]], ['Ycirc', [374]], ['ycirc', [375]], ['Ycy', [1067]], ['ycy', [1099]], ['yen', [165]], ['Yfr', [120092]], ['yfr', [120118]], ['YIcy', [1031]], ['yicy', [1111]], ['Yopf', [120144]], ['yopf', [120170]], ['Yscr', [119988]], ['yscr', [120014]], ['YUcy', [1070]], ['yucy', [1102]], ['yuml', [255]], ['Yuml', [376]], ['Zacute', [377]], ['zacute', [378]], ['Zcaron', [381]], ['zcaron', [382]], ['Zcy', [1047]], ['zcy', [1079]], ['Zdot', [379]], ['zdot', [380]], ['zeetrf', [8488]], ['ZeroWidthSpace', [8203]], ['Zeta', [918]], ['zeta', [950]], ['zfr', [120119]], ['Zfr', [8488]], ['ZHcy', [1046]], ['zhcy', [1078]], ['zigrarr', [8669]], ['zopf', [120171]], ['Zopf', [8484]], ['Zscr', [119989]], ['zscr', [120015]], ['zwj', [8205]], ['zwnj', [8204]]];
 
 var alphaIndex = {};
@@ -6061,7 +6232,7 @@ function createIndexes(alphaIndex, charIndex) {
 
 module.exports = Html5Entities;
 
-},{}],55:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 var ALPHA_INDEX = {
     '&lt': '<',
     '&gt': '>',
@@ -6218,7 +6389,7 @@ XmlEntities.prototype.encodeNonASCII = function(str) {
 
 module.exports = XmlEntities;
 
-},{}],56:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 module.exports = CollectingHandler;
 
 function CollectingHandler(cbs){
@@ -6275,7 +6446,7 @@ CollectingHandler.prototype.restart = function(){
 	}
 };
 
-},{"./":63}],57:[function(require,module,exports){
+},{"./":64}],58:[function(require,module,exports){
 var index = require("./index.js"),
     DomHandler = index.DomHandler,
     DomUtils = index.DomUtils;
@@ -6372,7 +6543,7 @@ FeedHandler.prototype.onend = function(){
 
 module.exports = FeedHandler;
 
-},{"./index.js":63,"inherits":65}],58:[function(require,module,exports){
+},{"./index.js":64,"inherits":67}],59:[function(require,module,exports){
 var Tokenizer = require("./Tokenizer.js");
 
 /*
@@ -6727,7 +6898,7 @@ Parser.prototype.done = Parser.prototype.end;
 
 module.exports = Parser;
 
-},{"./Tokenizer.js":61,"events":47,"inherits":65}],59:[function(require,module,exports){
+},{"./Tokenizer.js":62,"events":48,"inherits":67}],60:[function(require,module,exports){
 module.exports = ProxyHandler;
 
 function ProxyHandler(cbs){
@@ -6755,7 +6926,7 @@ Object.keys(EVENTS).forEach(function(name){
 		throw Error("wrong number of arguments");
 	}
 });
-},{"./":63}],60:[function(require,module,exports){
+},{"./":64}],61:[function(require,module,exports){
 module.exports = Stream;
 
 var Parser = require("./WritableStream.js");
@@ -6791,7 +6962,7 @@ Object.keys(EVENTS).forEach(function(name){
 		throw Error("wrong number of arguments!");
 	}
 });
-},{"../":63,"./WritableStream.js":62,"inherits":65}],61:[function(require,module,exports){
+},{"../":64,"./WritableStream.js":63,"inherits":67}],62:[function(require,module,exports){
 module.exports = Tokenizer;
 
 var decodeCodePoint = require("entities/lib/decode_codepoint.js"),
@@ -7699,7 +7870,7 @@ Tokenizer.prototype._emitPartial = function(value){
 	}
 };
 
-},{"entities/lib/decode_codepoint.js":29,"entities/maps/entities.json":32,"entities/maps/legacy.json":33,"entities/maps/xml.json":34}],62:[function(require,module,exports){
+},{"entities/lib/decode_codepoint.js":30,"entities/maps/entities.json":33,"entities/maps/legacy.json":34,"entities/maps/xml.json":35}],63:[function(require,module,exports){
 module.exports = Stream;
 
 var Parser = require("./Parser.js"),
@@ -7725,7 +7896,7 @@ WritableStream.prototype._write = function(chunk, encoding, cb){
 	this._parser.write(chunk);
 	cb();
 };
-},{"./Parser.js":58,"buffer":10,"inherits":65,"readable-stream":8,"stream":96,"string_decoder":9}],63:[function(require,module,exports){
+},{"./Parser.js":59,"buffer":10,"inherits":67,"readable-stream":8,"stream":99,"string_decoder":9}],64:[function(require,module,exports){
 var Parser = require("./Parser.js"),
     DomHandler = require("domhandler");
 
@@ -7795,10 +7966,43 @@ module.exports = {
 	}
 };
 
-},{"./CollectingHandler.js":56,"./FeedHandler.js":57,"./Parser.js":58,"./ProxyHandler.js":59,"./Stream.js":60,"./Tokenizer.js":61,"./WritableStream.js":62,"domelementtype":16,"domhandler":17,"domutils":20}],64:[function(require,module,exports){
+},{"./CollectingHandler.js":57,"./FeedHandler.js":58,"./Parser.js":59,"./ProxyHandler.js":60,"./Stream.js":61,"./Tokenizer.js":62,"./WritableStream.js":63,"domelementtype":17,"domhandler":18,"domutils":21}],65:[function(require,module,exports){
+'use strict';
+if (!Array.prototype.find) {
+    Object.defineProperty(Array.prototype, 'find', {
+        value: function (predicate) {
+
+            if (this == null) {
+                throw new TypeError('this is null or not defined');
+            }
+
+            var obj = Object(this);
+            var len = obj.length >>> 0;
+
+            if (typeof predicate !== 'function') {
+                throw new TypeError('predicate must be a function');
+            }
+
+            var thisArg = arguments[1];
+
+            var index = 0;
+
+            while (index < len) {
+                var iValue = obj[index];
+                if (predicate.call(thisArg, iValue, index, obj)) {
+                    return iValue;
+                }
+                index++;
+            }
+
+            return undefined;
+        }
+    });
+}
+},{}],66:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
-  var eLen = nBytes * 8 - mLen - 1
+  var eLen = (nBytes * 8) - mLen - 1
   var eMax = (1 << eLen) - 1
   var eBias = eMax >> 1
   var nBits = -7
@@ -7811,12 +8015,12 @@ exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   e = s & ((1 << (-nBits)) - 1)
   s >>= (-nBits)
   nBits += eLen
-  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+  for (; nBits > 0; e = (e * 256) + buffer[offset + i], i += d, nBits -= 8) {}
 
   m = e & ((1 << (-nBits)) - 1)
   e >>= (-nBits)
   nBits += mLen
-  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+  for (; nBits > 0; m = (m * 256) + buffer[offset + i], i += d, nBits -= 8) {}
 
   if (e === 0) {
     e = 1 - eBias
@@ -7831,7 +8035,7 @@ exports.read = function (buffer, offset, isLE, mLen, nBytes) {
 
 exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   var e, m, c
-  var eLen = nBytes * 8 - mLen - 1
+  var eLen = (nBytes * 8) - mLen - 1
   var eMax = (1 << eLen) - 1
   var eBias = eMax >> 1
   var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
@@ -7864,7 +8068,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
       m = 0
       e = eMax
     } else if (e + eBias >= 1) {
-      m = (value * c - 1) * Math.pow(2, mLen)
+      m = ((value * c) - 1) * Math.pow(2, mLen)
       e = e + eBias
     } else {
       m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
@@ -7881,7 +8085,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],65:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -7906,7 +8110,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],66:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -7929,7 +8133,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],67:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 'use strict';
 
 var fnToStr = Function.prototype.toString;
@@ -7970,7 +8174,7 @@ module.exports = function isCallable(value) {
 	return strClass === fnClass || strClass === genClass;
 };
 
-},{}],68:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 'use strict';
 
 var getDay = Date.prototype.getDay;
@@ -7992,7 +8196,7 @@ module.exports = function isDateObject(value) {
 	return hasToStringTag ? tryDateObject(value) : toStr.call(value) === dateClass;
 };
 
-},{}],69:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 'use strict';
 
 var has = require('has');
@@ -8033,7 +8237,7 @@ module.exports = function isRegex(value) {
 	return tryRegexExecCall(value);
 };
 
-},{"has":51}],70:[function(require,module,exports){
+},{"has":52}],72:[function(require,module,exports){
 'use strict';
 
 var toStr = Object.prototype.toString;
@@ -8062,14 +8266,14 @@ if (hasSymbols) {
 	};
 }
 
-},{}],71:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],72:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v3.3.1
  * https://jquery.com/
@@ -18435,7 +18639,7 @@ if ( !noGlobal ) {
 return jQuery;
 } );
 
-},{}],73:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -18456,6 +18660,12 @@ var _upndown = require('upndown');
 
 var _upndown2 = _interopRequireDefault(_upndown);
 
+require('custom-event-polyfill');
+
+require('ie-array-find-polyfill');
+
+require('../lib/first-element-child');
+
 var _util = require('../lib/util');
 
 var util = _interopRequireWildcard(_util);
@@ -18470,9 +18680,9 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var editorHtml = '<div class="\\{classNames.LiteEditor\\}" data-action-mouseup="onPutCaret" data-action-keydown="onKeyDown" data-selector="lite-editor" contenteditable data-action-input="onInput" data-action-paste="onPaste" style="<!-- BEGIN showSource:exist -->display:none;<!-- END showSource:exist --><!-- BEGIN hideEditor:exist -->display:none;"<!-- END hideEditor:exist --><!-- BEGIN minHeight:exist -->min-height: {minHeight}px;<!-- END minHeight:exist --><!-- BEGIN maxHeight:exist -->max-height:{maxHeight}px;<!-- END maxHeight:exist -->">{value}</div>\n<textarea class="\\{classNames.LiteEditorSource\\}" data-selector="lite-editor-source" style="<!-- BEGIN showSource:empty -->display:none;<!-- END showSource:empty --><!-- BEGIN minHeight:exist -->min-height: {minHeight}px;<!-- END minHeight:exist --><!-- BEGIN maxHeight:exist -->max-height:{maxHeight}px;<!-- END maxHeight:exist -->" {attr} data-bind-oneway="formatedValue" data-action-input="onDirectInput"></textarea>';
-var btnHtml = '<div class="\\{classNames.LiteEditorToolBox\\}" data-selector="lite-editor-toolbox">\n\n    <!-- BEGIN source:exist -->\n    <div class="\\{classNames.LiteEditorBtnGroupWrapRight\\}">\n        <div class="\\{classNames.LiteEditorBtnGroup\\}">\n            <button class="\\{classNames.LiteEditorBtn\\}<!-- BEGIN showSource:empty --> \\{classNames.LiteEditorBtnActive\\}<!-- END showSource:empty -->" data-action-click="toggleSource" type="button" <!-- BEGIN showSource:empty --> disabled<!-- END showSource:empty --><!-- BEGIN disableEditorMode:exist --> disabled<!-- END disableEditorMode:exist -->>\n                <i class="\\{classNames.LiteEditorFontAbc\\}"></i>\n            </button>\n            <button class="\\{classNames.LiteEditorBtn\\}<!-- BEGIN showSource:exist --> \\{classNames.LiteEditorBtnActive\\}<!-- END showSource:exist -->" data-action-click="toggleSource" type="button" <!-- BEGIN showSource:exist --> disabled<!-- END showSource:exist -->>\n                <i class="\\{classNames.LiteEditorFontSource\\}"></i>\n            </button>\n        </div>\n    </div>\n    <!-- END source:exist -->\n\n    <!-- BEGIN selectOptions.0:exist -->\n    <div class="\\{classNames.LiteEditorSelectWrap\\}">\n        <select class="\\{classNames.LiteEditorSelect\\}"<!-- BEGIN selectName:exist --> name="{selectName}"<!-- END selectName:exist --> data-action-change="changeOption" data-bind="selectedOption">\n        <!-- BEGIN selectOptions:loop -->\n        <option value="{value}">{label}</option>\n        <!-- END selectOptions:loop -->\n        </select>\n        <!-- BEGIN extendLabel:exist -->\n        <label>{extendLabel}</label>\n        <input type="text" name="{selectName}[insertExtend]" class="\\{classNames.LiteEditorExtendInput\\}" data-bind="extendValue"/>\n        <!-- END extendLabel:exist -->\n    </div>\n    <!-- END selectOptions.0:exist -->\n\n    <div class="\\{classNames.LiteEditorBtnGroupWrap\\}" <!-- BEGIN hideBtns:exist --> style="display:none;"<!-- END hideBtns:exist -->>\n        \n        <!-- BEGIN groups:loop -->\n        <div class="\\\\{classNames.LiteEditorBtnGroup\\\\}" data-selector="btn-group">\n            <!-- \\BEGIN groups.{i}.items:loop -->\n\n            <!-- \\BEGIN action:touch#redo -->\n            <button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}" data-action-click="redo"<!-- \\\\BEGIN canRedo:empty --> disabled<!-- \\\\END canRedo:empty --> type="button">\\{label\\}</button>\n            <!-- \\END action:touch#redo -->\n\n            <!-- \\BEGIN action:touch#undo -->\n            <button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}" data-action-click="undo"<!-- \\\\BEGIN canUndo:empty --> disabled<!-- \\\\END canUndo:empty --> type="button">\\{label\\}</button>\n            <!-- \\END action:touch#undo -->\n\n            <!-- \\BEGIN action:touch#extra -->\n            <button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}<!-- \\BEGIN selfClassName:exist --> \\{selfClassName\\}<!-- \\END selfClassName:exist -->" data-action-click="onClick(\\{index\\})" type="button">\\{label\\}</button>\n            <!-- \\END action:touch#extra -->\n\n            <!-- \\BEGIN action:empty -->\n            <button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}<!-- \\BEGIN selfClassName:exist --> \\{selfClassName\\}<!-- \\END selfClassName:exist --><!-- \\BEGIN selected:exist --> \\\\\\{classNames.LiteEditorBtnActive\\\\\\}<!-- \\END selected:exist -->"\n            <!-- \\BEGIN tag:exist -->\n            <!-- \\BEGIN selected:empty --> data-action-click="insertTag(\\{tag\\},\\{className\\},\\{sampleText\\})"<!-- \\END selected:empty -->\n            <!-- \\BEGIN selected:exist --> data-action-click="unwrapTag(\\{tag\\},\\{className\\},\\{sampleText\\})"<!-- \\END selected:exist -->\n            <!-- \\END tag:exist -->\n            <!-- \\BEGIN tag:empty --> data-action-click="insertTag(span,\\{className\\},\\{sampleText\\})"<!-- \\END tag:empty -->\n            type="button">\\{label\\}</button>\n            <!-- \\END action:empty -->\n            <!-- \\END groups.{i}.items:loop -->\n        </div>\n        <!-- END groups:loop -->\n    </div>\n</div>';
-var tooltipHtml = '<div data-selector="lite-editor-tooltip">\n<!-- BEGIN tooltipLabel:exist -->\n<div class="\\{classNames.LiteEditorTooltipWrap\\}">\n    <div class="\\{classNames.LiteEditorTooltipOuter\\}">\n        <div class="\\{classNames.LiteEditorTooltipInner\\}">\n            <div class="\\{classNames.LiteEditorTooltip\\}">\n                <span class="\\{classNames.LiteEditorBtnCloseWrap\\}">\n                    <span class="\\{classNames.LiteEditorBtnCloseLabel\\}">\\{message.closeLabel\\}</span>\n                    <button type="button" data-action-click="closeTooltip()" class="\\{classNames.LiteEditorBtn\\} \\{classNames.LiteEditorBtnClose\\}">\n                        <i class="\\{classNames.LiteEditorFontClose\\}"></i>\n                    </button>\n                </span>\n                <!-- BEGIN linkNew:exist -->\n                <h2 class="\\{classNames.LiteEditorTooltipTitle\\}"><i class="\\{classNames.LiteEditorFontLink\\}"></i>\\{message.addLinkTitle\\}</h2>\n                <!-- END linkNew:exist -->\n                <!-- BEGIN linkNew:empty -->\n                <h2 class="\\{classNames.LiteEditorTooltipTitle\\}"><i class="\\{classNames.LiteEditorFontLink\\}"></i>\\{message.updateLinkTitle\\}</h2>\n                <!-- END linkNew:empty -->\n                <div class="\\{classNames.LiteEditorTooltipBody\\}">\n                    <table class="\\{classNames.LiteEditorTooltipTable\\}">\n                        <tr>\n                            <th>\\{message.linkLabel\\}</th>\n                            <td><input type="text" data-bind="tooltipLabel" class="\\{classNames.LiteEditorTooltipInput\\}" data-action-keydown="preventSubmit()"></td>\n                        </tr>\n                        <tr>\n                            <th>\\{message.linkUrl\\}</th>\n                            <td><input type="text" data-bind="tooltipUrl" class="\\{classNames.LiteEditorTooltipInput\\}" data-action-keydown="preventSubmit()"></td>\n                        </tr>\n                        <tr>\n                            <td></td>\n                            <td>\n                                <!-- BEGIN linkNew:exist -->\n                                <button type="button" data-action-click="insertAtag()" class="\\{classNames.LiteEditorBtn\\}">\n                                    <i class="\\{classNames.LiteEditorFontLink\\}"></i>\n                                    \\{message.addLink\\}\n                                </button> \n                                <!-- END linkNew:exist -->\n\n                                <!-- BEGIN linkNew:empty -->\n                                <button type="button" data-action-click="updateLink()" class="\\{classNames.LiteEditorBtn\\}">\n                                    <i class="\\{classNames.LiteEditorFontUpdate\\}"></i>\n                                    \\{message.updateLink\\}\n                                </button>\n                                <button type="button" data-action-click="removeLink()" class="\\{classNames.LiteEditorBtn\\}">\n                                    <i class="\\{classNames.LiteEditorFontRemove\\}"></i>\n                                    \\{message.removeLink\\}\n                                </button>\n                                <!-- END linkNew:empty -->\n                            </td>\n                        </tr>\n                    </table>\n                </div>\n            </div>\n        </div>\n    </div>\n</div>\n<!-- END tooltipLabel:exist -->\n</div>';
+var editorHtml = '<div class="\\{classNames.LiteEditor\\}" data-action-mouseup="onPutCaret" data-action-keydown="onKeyDown" data-action-input="onInput" data-selector="lite-editor" contenteditable data-action-paste="onPaste" style="<!-- BEGIN showSource:exist -->display:none;<!-- END showSource:exist --><!-- BEGIN hideEditor:exist -->display:none;"<!-- END hideEditor:exist --><!-- BEGIN minHeight:exist -->min-height: {minHeight}px;<!-- END minHeight:exist --><!-- BEGIN maxHeight:exist -->max-height:{maxHeight}px;<!-- END maxHeight:exist -->">{value}</div>\n<textarea class="\\{classNames.LiteEditorSource\\}" data-selector="lite-editor-source" style="<!-- BEGIN showSource:empty -->display:none;<!-- END showSource:empty --><!-- BEGIN minHeight:exist -->min-height: {minHeight}px;<!-- END minHeight:exist --><!-- BEGIN maxHeight:exist -->max-height:{maxHeight}px;<!-- END maxHeight:exist -->" {attr} data-bind-oneway="formatedValue" data-action-input="onDirectInput"></textarea>';
+var btnHtml = '<div class="\\{classNames.LiteEditorToolBox\\}" data-selector="lite-editor-toolbox">\n\n\t<!-- BEGIN source:exist -->\n\t<div class="\\{classNames.LiteEditorBtnGroupWrapRight\\}">\n\t\t<div class="\\{classNames.LiteEditorBtnGroup\\}">\n\t\t\t<button class="\\{classNames.LiteEditorBtn\\}<!-- BEGIN showSource:empty --> \\{classNames.LiteEditorBtnActive\\}<!-- END showSource:empty -->"\n\t\t\t data-action-click="toggleSource" type="button" <!-- BEGIN showSource:empty --> disabled\n\t\t\t\t<!-- END showSource:empty -->\n\t\t\t\t<!-- BEGIN disableEditorMode:exist -->disabled\n\t\t\t\t<!-- END disableEditorMode:exist -->>\n\t\t\t\t<i class="\\{classNames.LiteEditorFontAbc\\}"></i>\n\t\t\t</button>\n\t\t\t<button class="\\{classNames.LiteEditorBtn\\}<!-- BEGIN showSource:exist --> \\{classNames.LiteEditorBtnActive\\}<!-- END showSource:exist -->"\n\t\t\t data-action-click="toggleSource" type="button" <!-- BEGIN showSource:exist --> disabled\n\t\t\t\t<!-- END showSource:exist -->>\n\t\t\t\t<i class="\\{classNames.LiteEditorFontSource\\}"></i>\n\t\t\t</button>\n\t\t</div>\n\t</div>\n\t<!-- END source:exist -->\n\n\t<!-- BEGIN selectOptions.0:exist -->\n\t<div class="\\{classNames.LiteEditorSelectWrap\\}">\n\t\t<select class="\\{classNames.LiteEditorSelect\\}" <!-- BEGIN selectName:exist --> name="{selectName}"\n\t\t\t<!-- END selectName:exist -->data-action-change="changeOption" data-bind="selectedOption">\n\t\t\t<!-- BEGIN selectOptions:loop -->\n\t\t\t<option value="{value}">{label}</option>\n\t\t\t<!-- END selectOptions:loop -->\n\t\t</select>\n\t\t<!-- BEGIN extendLabel:exist -->\n\t\t<label>{extendLabel}</label>\n\t\t<input type="text" name="{selectName}[insertExtend]" class="\\{classNames.LiteEditorExtendInput\\}" data-bind="extendValue"\n\t\t/>\n\t\t<!-- END extendLabel:exist -->\n\t</div>\n\t<!-- END selectOptions.0:exist -->\n\n\t<div class="\\{classNames.LiteEditorBtnGroupWrap\\}" <!-- BEGIN hideBtns:exist --> style="display:none;"\n\t\t<!-- END hideBtns:exist -->>\n\n\t\t<!-- BEGIN groups:loop -->\n\t\t<div class="\\\\{classNames.LiteEditorBtnGroup\\\\}" data-selector="btn-group">\n\t\t\t<!-- \\BEGIN groups.{i}.items:loop -->\n\n\t\t\t<!-- \\BEGIN action:touch#redo -->\n\t\t\t<button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}" data-action-click="redo" <!-- \\\\BEGIN canRedo:empty\n\t\t\t --> disabled <!-- \\\\END canRedo:empty -->type="button">\\{label\\}</button>\n\t\t\t<!-- \\END action:touch#redo -->\n\n\t\t\t<!-- \\BEGIN action:touch#undo -->\n\t\t\t<button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}" data-action-click="undo" <!-- \\\\BEGIN canUndo:empty\n\t\t\t --> disabled <!-- \\\\END canUndo:empty -->type="button">\\{label\\}</button>\n\t\t\t<!-- \\END action:touch#undo -->\n\n\t\t\t<!-- \\BEGIN action:touch#extra -->\n\t\t\t<button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}<!-- \\BEGIN selfClassName:exist --> \\{selfClassName\\}<!-- \\END selfClassName:exist -->"\n\t\t\t data-action-click="onClick(\\{index\\})" type="button">\\{label\\}</button>\n\t\t\t<!-- \\END action:touch#extra -->\n\n\t\t\t<!-- \\BEGIN action:empty -->\n\t\t\t<button data-index="\\{index\\}" class="\\\\\\{classNames.LiteEditorBtn\\\\\\}<!-- \\BEGIN selfClassName:exist --> \\{selfClassName\\}<!-- \\END selfClassName:exist --><!-- \\BEGIN selected:exist --> \\\\\\{classNames.LiteEditorBtnActive\\\\\\}<!-- \\END selected:exist -->"\n\t\t\t <!-- \\BEGIN tag:exist -->\n\t\t\t\t<!-- \\BEGIN selected:empty -->data-action-click="insertTag(\\{tag\\},\\{className\\},\\{sampleText\\})"\n\t\t\t\t<!-- \\END selected:empty -->\n\t\t\t\t<!-- \\BEGIN selected:exist -->data-action-click="unwrapTag(\\{tag\\},\\{className\\},\\{sampleText\\})"\n\t\t\t\t<!-- \\END selected:exist -->\n\t\t\t\t<!-- \\END tag:exist -->\n\t\t\t\t<!-- \\BEGIN tag:empty -->data-action-click="insertTag(span,\\{className\\},\\{sampleText\\})"\n\t\t\t\t<!-- \\END tag:empty -->\n\t\t\t\ttype="button">\\{label\\}</button>\n\t\t\t<!-- \\END action:empty -->\n\t\t\t<!-- \\END groups.{i}.items:loop -->\n\t\t</div>\n\t\t<!-- END groups:loop -->\n\t</div>\n</div>';
+var tooltipHtml = '<div data-selector="lite-editor-tooltip">\n\t<!-- BEGIN tooltipLabel:exist -->\n\t<div class="\\{classNames.LiteEditorTooltipWrap\\}">\n\t\t<div class="\\{classNames.LiteEditorTooltipOuter\\}">\n\t\t\t<div class="\\{classNames.LiteEditorTooltipInner\\}">\n\t\t\t\t<div class="\\{classNames.LiteEditorTooltip\\}">\n\t\t\t\t\t<span class="\\{classNames.LiteEditorBtnCloseWrap\\}">\n\t\t\t\t\t\t<span class="\\{classNames.LiteEditorBtnCloseLabel\\}">\\{message.closeLabel\\}</span>\n\t\t\t\t\t\t<button type="button" data-action-click="closeTooltip()" class="\\{classNames.LiteEditorBtn\\} \\{classNames.LiteEditorBtnClose\\}">\n\t\t\t\t\t\t\t<i class="\\{classNames.LiteEditorFontClose\\}"></i>\n\t\t\t\t\t\t</button>\n\t\t\t\t\t</span>\n\t\t\t\t\t<!-- BEGIN linkNew:exist -->\n\t\t\t\t\t<h2 class="\\{classNames.LiteEditorTooltipTitle\\}">\n\t\t\t\t\t\t<i class="\\{classNames.LiteEditorFontLink\\}"></i>\\{message.addLinkTitle\\}</h2>\n\t\t\t\t\t<!-- END linkNew:exist -->\n\t\t\t\t\t<!-- BEGIN linkNew:empty -->\n\t\t\t\t\t<h2 class="\\{classNames.LiteEditorTooltipTitle\\}">\n\t\t\t\t\t\t<i class="\\{classNames.LiteEditorFontLink\\}"></i>\\{message.updateLinkTitle\\}</h2>\n\t\t\t\t\t<!-- END linkNew:empty -->\n\t\t\t\t\t<div class="\\{classNames.LiteEditorTooltipBody\\}">\n\t\t\t\t\t\t<table class="\\{classNames.LiteEditorTooltipTable\\}">\n\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t<th>\\{message.linkLabel\\}</th>\n\t\t\t\t\t\t\t\t<td>\n\t\t\t\t\t\t\t\t\t<input type="text" data-bind="tooltipLabel" class="\\{classNames.LiteEditorTooltipInput\\}" data-action-keydown="preventSubmit()">\n\t\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t<th>\\{message.linkUrl\\}</th>\n\t\t\t\t\t\t\t\t<td>\n\t\t\t\t\t\t\t\t\t<input type="text" data-bind="tooltipUrl" class="\\{classNames.LiteEditorTooltipInput\\}" data-action-keydown="preventSubmit()">\n\t\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t<td></td>\n\t\t\t\t\t\t\t\t<td>\n\t\t\t\t\t\t\t\t\t<!-- BEGIN linkNew:exist -->\n\t\t\t\t\t\t\t\t\t<button type="button" data-action-click="insertAtag()" class="\\{classNames.LiteEditorBtn\\}">\n\t\t\t\t\t\t\t\t\t\t<i class="\\{classNames.LiteEditorFontLink\\}"></i>\n\t\t\t\t\t\t\t\t\t\t\\{message.addLink\\}\n\t\t\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t\t\t<!-- END linkNew:exist -->\n\n\t\t\t\t\t\t\t\t\t<!-- BEGIN linkNew:empty -->\n\t\t\t\t\t\t\t\t\t<button type="button" data-action-click="updateLink()" class="\\{classNames.LiteEditorBtn\\}">\n\t\t\t\t\t\t\t\t\t\t<i class="\\{classNames.LiteEditorFontUpdate\\}"></i>\n\t\t\t\t\t\t\t\t\t\t\\{message.updateLink\\}\n\t\t\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t\t\t<button type="button" data-action-click="removeLink()" class="\\{classNames.LiteEditorBtn\\}">\n\t\t\t\t\t\t\t\t\t\t<i class="\\{classNames.LiteEditorFontRemove\\}"></i>\n\t\t\t\t\t\t\t\t\t\t\\{message.removeLink\\}\n\t\t\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t\t\t<!-- END linkNew:empty -->\n\t\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t</table>\n\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t</div>\n\t</div>\n\t<!-- END tooltipLabel:exist -->\n</div>';
 
 
 var Entities = require('html-entities').XmlEntities;
@@ -18499,19 +18709,19 @@ var defaultbtnOptions = [{
   tag: 'strong',
   className: '',
   group: 'mark',
-  sampleText: 'strong text'
+  sampleText: ' '
 }, {
   label: '<i class="lite-editor-font-italic"></i>',
   tag: 'i',
   className: '',
   group: 'mark',
-  sampleText: 'italic text'
+  sampleText: ' '
 }, {
   label: '<i class="lite-editor-font-underline"></i>',
   tag: 'u',
   className: '',
   group: 'mark',
-  sampleText: 'underline'
+  sampleText: ' '
 }];
 
 var defaults = {
@@ -18603,9 +18813,9 @@ var LiteEditor = function (_aTemplate) {
     };
 
     if (_this.data.btnPosition === 'bottom') {
-      template = '' + editorHtml + btnHtml + tooltipHtml;
+      template = util.removeIndentNewline('' + editorHtml + btnHtml + tooltipHtml);
     } else {
-      template = '' + btnHtml + editorHtml + tooltipHtml;
+      template = util.removeIndentNewline('' + btnHtml + editorHtml + tooltipHtml);
     }
 
     _this.addTemplate(_this.id, template);
@@ -18614,6 +18824,8 @@ var LiteEditor = function (_aTemplate) {
       var value = selector.value;
       if (!_this.data.sourceFirst) {
         value = _this.makeEditableHtml(value);
+      } else {
+        value = selector.innerHTML;
       }
       if (_this.data.escapeNotRegisteredTags) {
         value = _this.escapeNotRegisteredTags(value);
@@ -18854,6 +19066,19 @@ var LiteEditor = function (_aTemplate) {
       this.data.value = editor.innerHTML;
     }
   }, {
+    key: 'insertHtmlAtCursor',
+    value: function insertHtmlAtCursor(html) {
+      if (this.data.showSource) {
+        var source = this._getElementByQuery('[data-selector="lite-editor-source"]');
+        util.replaceSelectionWithText(source, html);
+        this.data.value = this.makeEditableHtml(source.value);
+      } else {
+        util.insertHtmlAtCursor(html);
+        var editor = this._getElementByQuery('[data-selector="lite-editor"]');
+        this.data.value = editor.innerHTML;
+      }
+    }
+  }, {
     key: 'saveSelection',
     value: function saveSelection() {
       this.selection = util.saveSelection();
@@ -18887,9 +19112,11 @@ var LiteEditor = function (_aTemplate) {
     value: function insertTag(tag, className, sampleText) {
       var _this4 = this;
 
-      var selection = util.getSelection();
+      var groups = this.data.groups;
       var editor = this._getElementByQuery('[data-selector="lite-editor"]');
+      var source = this._getElementByQuery('[data-selector="lite-editor-source"]');
       var element = util.getElementBySelection();
+      var selection = util.getSelection(source);
 
       if (!this.data.showSource && !editor.contains(element)) {
         return;
@@ -18912,7 +19139,6 @@ var LiteEditor = function (_aTemplate) {
         insertHtml = selection + '<' + tag + '>';
       }
       if (this.data.showSource) {
-        var source = this._getElementByQuery('[data-selector="lite-editor-source"]');
         if (this.data.mode === 'markdown') {
           und.convert(insertHtml, function (err, markdown) {
             util.replaceSelectionWithText(source, markdown);
@@ -18924,7 +19150,14 @@ var LiteEditor = function (_aTemplate) {
         }
       } else {
         this.insertHtml(insertHtml.replace(/\r\n|\r|\n/g, '<br>'));
-        this.updateToolBox();
+        groups.forEach(function (group) {
+          group.items.forEach(function (btn) {
+            if (btn.tag === tag && btn.className === className) {
+              btn.selected = true;
+            }
+          });
+        });
+        this.update('html', '[data-selector="lite-editor-toolbox"]');
       }
       this._fireEvent('insertTag');
     }
@@ -18935,6 +19168,8 @@ var LiteEditor = function (_aTemplate) {
       this.data.tooltipClassName = className;
       this.data.linkNew = true;
       this.update('html', '[data-selector="lite-editor-tooltip"]');
+      var urlInput = this._getElementByQuery('[data-bind="tooltipUrl"]');
+      urlInput.focus();
     }
   }, {
     key: 'insertAtag',
@@ -19087,27 +19322,27 @@ var LiteEditor = function (_aTemplate) {
       return false;
     }
   }, {
-    key: 'onInput',
-    value: function onInput() {
-      var editor = this._getElementByQuery('[data-selector="lite-editor"]');
-      var textarea = this._getElementByQuery('[data-selector="lite-editor-source"]');
-      this.data.value = editor.innerHTML;
-      this.data.formatedValue = this.format(this.data.value);
-      textarea.value = this.data.formatedValue;
-    }
-  }, {
     key: 'onPaste',
     value: function onPaste() {
       var e = this.e;
       var editor = this._getElementByQuery('[data-selector="lite-editor"]');
       var textarea = this._getElementByQuery('[data-selector="lite-editor-source"]');
       e.preventDefault();
-      var insertText = e.clipboardData.getData('text/plain');
+      var insertText = '';
+      if (e.clipboardData) {
+        insertText = e.clipboardData.getData('text/plain');
+      } else if (window.clipboardData) {
+        insertText = window.clipboardData.getData('Text');
+      }
       if (this._isFocused() && insertText) {
-        this.insertHtml(insertText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>').replace(/\s/g, '&nbsp;'));
+        this.insertHtmlAtCursor(insertText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>').replace(/\s/g, '&nbsp;'));
         this.data.value = editor.innerHTML;
         this.data.formatedValue = this.format(this.data.value);
         textarea.value = this.data.formatedValue;
+        // ⌘VVVVVVV
+        var pos = util.getCaretPos(editor);
+        util.clearSelection();
+        util.setCaretPos(editor, pos);
       }
       this._fireEvent('paste');
     }
@@ -19117,6 +19352,7 @@ var LiteEditor = function (_aTemplate) {
       var editor = this._getElementByQuery('[data-selector="lite-editor"]');
       var textarea = this._getElementByQuery('[data-selector="lite-editor-source"]');
       var e = this.e;
+      var pos = util.getCaretPos(editor);
 
       if (e.ctrlKey || e.metaKey) {
         if (e.which === 90 || e.keyCode === 90) {
@@ -19135,18 +19371,32 @@ var LiteEditor = function (_aTemplate) {
         this.onPutCaret();
         return;
       }
-
-      var pos = util.getCaretPos(editor);
       // on purpose
-      this.insertHtml('<br> ');
-      editor.innerHTML = editor.innerHTML.replace(/<br> <\/(.*?)>/g, '</$1><br> ');
-      this.data.value = editor.innerHTML;
+      this.insertHtmlAtCursor('<br> ');
+      var innerHTML = editor.innerHTML.replace(/<br> <\/(.*?)>/g, '</$1><br> ');
+      if (!util.hasLastBr(editor)) {
+        innerHTML += '<br>';
+      }
+      editor.innerHTML = innerHTML;
+      this.data.value = innerHTML;
       this.data.formatedValue = this.format(this.data.value);
       editor.scrollTop = editor.scrollHeight;
       textarea.value = this.data.formatedValue;
       editor.focus();
       util.setCaretPos(editor, pos + 1);
       e.preventDefault();
+    }
+  }, {
+    key: 'onInput',
+    value: function onInput() {
+      var editor = this._getElementByQuery('[data-selector="lite-editor"]');
+      // if (!util.hasLastBr(editor)) {
+      //   editor.appendChild(document.createElement('br'));
+      // }
+      var textarea = this._getElementByQuery('[data-selector="lite-editor-source"]');
+      this.data.value = editor.innerHTML;
+      this.data.formatedValue = this.format(this.data.value);
+      textarea.value = this.data.formatedValue;
     }
   }, {
     key: 'preventSubmit',
@@ -19169,6 +19419,9 @@ var LiteEditor = function (_aTemplate) {
           tags.push({ tagName: target.tagName.toLowerCase(), className: target.getAttribute('class') || '' });
           var parent = target.parentElement;
           while (parent !== editor) {
+            if (!parent) {
+              break;
+            }
             var tagName = parent.tagName.toLowerCase();
             tags.push({
               tagName: tagName,
@@ -19269,22 +19522,28 @@ var LiteEditor = function (_aTemplate) {
     value: function unwrapTag(tag, className) {
       var editor = this._getElementByQuery('[data-selector="lite-editor"]');
       var pos = util.getCaretPos(editor);
-      var node = this.getSelectionNode();
-      while (true) {
-        var nodeClassName = node.getAttribute('class') || '';
-        if (node.tagName.toLowerCase() === tag && nodeClassName === className) {
-          if (tag === 'a') {
-            this.updateTooltip(node);
-          } else {
-            util.unwrapTag(node);
+      var node = util.getElementBySelection();
+      var length = util.getSelectionLength();
+      var nodePos = util.getCaretPos(node);
+      if (node.parentElement === editor && node.textContent && nodePos === node.textContent.length && length === 0) {
+        util.moveCaretAfter(node);
+      } else {
+        while (true) {
+          var nodeClassName = node.getAttribute('class') || '';
+          if (node.tagName.toLowerCase() === tag && nodeClassName === className) {
+            if (tag === 'a') {
+              this.updateTooltip(node);
+            } else {
+              util.unwrapTag(node);
+            }
+            break;
           }
-          break;
+          node = node.parentElement;
         }
-        node = node.parentElement;
+        this.data.value = editor.innerHTML;
+        editor.focus();
+        util.setCaretPos(editor, pos, length);
       }
-      this.data.value = editor.innerHTML;
-      editor.focus();
-      util.setCaretPos(editor, pos);
       this.onPutCaret();
       this._fireEvent('unwrapTag');
     }
@@ -19296,11 +19555,35 @@ var LiteEditor = function (_aTemplate) {
   }, {
     key: 'toggleSource',
     value: function toggleSource() {
-      var source = this.data.showSource;
-      this.data.showSource = !source;
+      this.data.showSource = !this.data.showSource;
       if (this.data.showSource) {
         this.data.formatedValue = this.format(this.data.value);
+        this.data.groups.forEach(function (group) {
+          group.items.forEach(function (btn) {
+            btn.selected = false;
+          });
+        });
       }
+      this.update();
+    }
+  }, {
+    key: 'showSource',
+    value: function showSource() {
+      this.data.showSource = true;
+      if (this.data.showSource) {
+        this.data.formatedValue = this.format(this.data.value);
+        this.data.groups.forEach(function (group) {
+          group.items.forEach(function (btn) {
+            btn.selected = false;
+          });
+        });
+      }
+      this.update();
+    }
+  }, {
+    key: 'hideSource',
+    value: function hideSource() {
+      this.data.showSource = false;
       this.update();
     }
   }, {
@@ -19314,7 +19597,7 @@ var LiteEditor = function (_aTemplate) {
       if (!txt) {
         return '';
       }
-      var replaced = txt.replace(/<br>(\s*)/g, '\n').replace(/<br>/g, '\n').replace(/&nbsp;/g, ' ').replace(/( +)/g, function (a) {
+      var replaced = txt.replace(/<br>(\s*)/g, '\n').replace(/<br>/g, '\n').replace(/&nbsp;/g, ' ').replace(/<script/g, '&lt;script').replace(/script>/g, 'script&gt;').replace(/( +)/g, function (a) {
         var length = a.length;
         var ret = '';
         for (var i = 0; i < length; i += 1) {
@@ -19328,6 +19611,7 @@ var LiteEditor = function (_aTemplate) {
       });
       if (replaced.slice(-1) === '\n') {
         replaced = replaced.slice(0, -1);
+        replaced += '<br>';
       }
       if (this.data.nl2br) {
         replaced = replaced.replace(/\n/g, '<br>\n');
@@ -19363,11 +19647,34 @@ var LiteEditor = function (_aTemplate) {
 
 exports.default = LiteEditor;
 module.exports = exports['default'];
-},{"../lib/util":75,"a-template":1,"deep-extend":12,"html-entities":52,"upndown":98}],74:[function(require,module,exports){
+},{"../lib/first-element-child":77,"../lib/util":78,"a-template":1,"custom-event-polyfill":12,"deep-extend":13,"html-entities":53,"ie-array-find-polyfill":65,"upndown":101}],76:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./core/');
-},{"./core/":73}],75:[function(require,module,exports){
+},{"./core/":75}],77:[function(require,module,exports){
+'use strict';
+
+// Overwrites native 'firstElementChild' prototype.
+// Adds Document & DocumentFragment support for IE9 & Safari.
+// Returns array instead of HTMLCollection.
+;(function (constructor) {
+  if (constructor && constructor.prototype && constructor.prototype.firstElementChild == null) {
+    Object.defineProperty(constructor.prototype, 'firstElementChild', {
+      get: function get() {
+        var node,
+            nodes = this.childNodes,
+            i = 0;
+        while (node = nodes[i++]) {
+          if (node.nodeType === 1) {
+            return node;
+          }
+        }
+        return null;
+      }
+    });
+  }
+})(window.Node || window.Element);
+},{}],78:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -19451,23 +19758,15 @@ var before = exports.before = function before(el, html) {
   el.insertAdjacentHTML('beforebegin', html);
 };
 
-var getSelection = exports.getSelection = function getSelection() {
-  var text = "";
+var getSelection = exports.getSelection = function getSelection(ele) {
   if (window.getSelection && window.getSelection().toString()) {
-    text = window.getSelection();
-    return text;
+    return window.getSelection();
   } else if (document.getSelection && document.getSelection().toString()) {
-    text = document.getSelection();
-    return text;
-  } else {
-    var selection = document.selection && document.selection.createRange();
-
-    if (!(typeof selection === "undefined") && selection.text && selection.text.toString()) {
-      text = selection.text;
-      return text;
-    }
+    return document.getSelection();
+  } else if (ele && typeof ele.selectionStart === 'number') {
+    return ele.value.substr(ele.selectionStart, ele.selectionEnd - ele.selectionStart);
   }
-  return false;
+  return '';
 };
 
 var saveSelection = exports.saveSelection = function saveSelection() {
@@ -19492,7 +19791,7 @@ var restoreSelection = exports.restoreSelection = function restoreSelection(rang
   }
 };
 
-var replaceSelectionWithHtml = exports.replaceSelectionWithHtml = function replaceSelectionWithHtml(html) {
+var insertHtmlAtCursor = exports.insertHtmlAtCursor = function insertHtmlAtCursor(html) {
   var range = void 0;
   if (window.getSelection && window.getSelection().getRangeAt) {
     range = window.getSelection().getRangeAt(0);
@@ -19511,16 +19810,49 @@ var replaceSelectionWithHtml = exports.replaceSelectionWithHtml = function repla
   }
 };
 
-var getElementBySelection = exports.getElementBySelection = function getElementBySelection() {
-  var sel = window.getSelection ? window.getSelection() : document.selection;
-  return sel.anchorNode;
+var replaceSelectionWithHtml = exports.replaceSelectionWithHtml = function replaceSelectionWithHtml(html) {
+  var range = void 0;
+  if (window.getSelection && window.getSelection().getRangeAt) {
+    var selection = window.getSelection();
+    range = selection.getRangeAt(0);
+    range.deleteContents();
+    var div = document.createElement("div");
+    div.innerHTML = html;
+    var frag = document.createDocumentFragment(),
+        child = void 0;
+    while (child = div.firstChild) {
+      frag.appendChild(child);
+    }
+    var temp = frag.firstElementChild;
+    var end = range.endContainer;
+    var newrange = document.createRange();
+    range.insertNode(frag.firstElementChild);
+    newrange.setStart(temp.firstChild, 0);
+    newrange.setEnd(temp.firstChild, temp.innerText.length);
+    clearSelection();
+    selection.addRange(newrange);
+  } else if (document.selection && document.selection.createRange) {
+    range = document.selection.createRange();
+    range.pasteHTML(html);
+  }
 };
 
-var replaceSelectionWithText = exports.replaceSelectionWithText = function replaceSelectionWithText(ele, text) {
-  var selectionStart = ele.selectionStart;
-  ele.value = '' + ele.value.substring(0, selectionStart) + text + ele.value.substring(ele.selectionEnd);
-  ele.focus();
-  ele.setSelectionRange(selectionStart, selectionStart + text.length);
+var moveCaretAfter = exports.moveCaretAfter = function moveCaretAfter(node) {
+  if (window.getSelection && window.getSelection().getRangeAt) {
+    var selection = window.getSelection();
+    var range = selection.getRangeAt(0);
+    var newnode = node.cloneNode(true);
+    var frag = document.createDocumentFragment();
+    node.remove();
+    frag.appendChild(newnode);
+    var lastChild = frag.appendChild(document.createTextNode('\u200B'));
+    var newrange = document.createRange();
+    range.insertNode(frag);
+    newrange.setStartAfter(lastChild);
+    newrange.setEndAfter(lastChild);
+    selection.removeAllRanges();
+    selection.addRange(newrange);
+  }
 };
 
 var unwrapTag = exports.unwrapTag = function unwrapTag(element) {
@@ -19531,7 +19863,48 @@ var unwrapTag = exports.unwrapTag = function unwrapTag(element) {
   parent.removeChild(element);
 };
 
-var setCaretPos = exports.setCaretPos = function setCaretPos(el, pos) {
+var getElementBySelection = exports.getElementBySelection = function getElementBySelection() {
+  if (window.getSelection) {
+    var selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      return selection.getRangeAt(0).startContainer.parentNode;
+    }
+  } else if (document.selection) {
+    return document.selection.createRange().parentElement();
+  }
+};
+
+var clearSelection = exports.clearSelection = function clearSelection() {
+  if (window.getSelection) {
+    if (window.getSelection().empty) {
+      // Chrome
+      window.getSelection().empty();
+    } else if (window.getSelection().removeAllRanges) {
+      // Firefox
+      window.getSelection().removeAllRanges();
+    }
+  } else if (document.selection) {
+    // IE?
+    document.selection.empty();
+  }
+};
+
+var replaceSelectionWithText = exports.replaceSelectionWithText = function replaceSelectionWithText(ele, text) {
+  var selectionStart = ele.selectionStart;
+  ele.value = '' + ele.value.substring(0, selectionStart) + text + ele.value.substring(ele.selectionEnd);
+  ele.focus();
+  ele.setSelectionRange(selectionStart, selectionStart + text.length);
+};
+
+var getSelectionLength = exports.getSelectionLength = function getSelectionLength() {
+  if (window.getSelection) {
+    return window.getSelection().toString().length;
+  } else if (document.selection) {
+    return document.selection().toString().length;
+  }
+};
+
+var setCaretPos = exports.setCaretPos = function setCaretPos(el, pos, length) {
   // Loop through all child nodes
   var nodes = [].slice.call(el.childNodes);
   for (var i = 0, n = nodes.length; i < n; i++) {
@@ -19542,8 +19915,14 @@ var setCaretPos = exports.setCaretPos = function setCaretPos(el, pos) {
         // finally add our range
         var range = document.createRange();
         var sel = window.getSelection();
-        range.setStart(node, pos);
-        range.collapse(true);
+
+        if (length) {
+          range.setStart(node, 0);
+          range.setEnd(node, length);
+        } else {
+          range.setStart(node, pos);
+          range.collapse(true);
+        }
         sel.removeAllRanges();
         sel.addRange(range);
         return -1; // we are done
@@ -19589,7 +19968,21 @@ var getCaretPos = exports.getCaretPos = function getCaretPos(element) {
   }
   return caretOffset;
 };
-},{}],76:[function(require,module,exports){
+
+var hasLastBr = exports.hasLastBr = function hasLastBr(element) {
+  var childNodes = element.childNodes;
+  var length = childNodes.length;
+  var offset = 1;
+  if (!childNodes[length - offset]) {
+    return false;
+  }
+  return childNodes[length - offset].tagName === 'BR';
+};
+
+var removeIndentNewline = exports.removeIndentNewline = function removeIndentNewline(str) {
+  return str.replace(/(\n|\t)/g, '');
+};
+},{}],79:[function(require,module,exports){
 'use strict';
 
 var range; // Create a range object for efficently rendering strings to elements.
@@ -20273,7 +20666,7 @@ var morphdom = morphdomFactory(morphAttrs);
 
 module.exports = morphdom;
 
-},{}],77:[function(require,module,exports){
+},{}],80:[function(require,module,exports){
 'use strict';
 
 // modified from https://github.com/es-shims/es5-shim
@@ -20415,7 +20808,7 @@ keysShim.shim = function shimObjectKeys() {
 
 module.exports = keysShim;
 
-},{"./isArguments":78}],78:[function(require,module,exports){
+},{"./isArguments":81}],81:[function(require,module,exports){
 'use strict';
 
 var toStr = Object.prototype.toString;
@@ -20434,7 +20827,7 @@ module.exports = function isArguments(value) {
 	return isArgs;
 };
 
-},{}],79:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -20482,7 +20875,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 
 
 }).call(this,require('_process'))
-},{"_process":80}],80:[function(require,module,exports){
+},{"_process":83}],83:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -20668,10 +21061,10 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],81:[function(require,module,exports){
+},{}],84:[function(require,module,exports){
 module.exports = require('./lib/_stream_duplex.js');
 
-},{"./lib/_stream_duplex.js":82}],82:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":85}],85:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -20702,7 +21095,7 @@ module.exports = require('./lib/_stream_duplex.js');
 
 /*<replacement>*/
 
-var processNextTick = require('process-nextick-args').nextTick;
+var pna = require('process-nextick-args');
 /*</replacement>*/
 
 /*<replacement>*/
@@ -20726,10 +21119,13 @@ var Writable = require('./_stream_writable');
 
 util.inherits(Duplex, Readable);
 
-var keys = objectKeys(Writable.prototype);
-for (var v = 0; v < keys.length; v++) {
-  var method = keys[v];
-  if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
+{
+  // avoid scope creep, the keys array can then be collected
+  var keys = objectKeys(Writable.prototype);
+  for (var v = 0; v < keys.length; v++) {
+    var method = keys[v];
+    if (!Duplex.prototype[method]) Duplex.prototype[method] = Writable.prototype[method];
+  }
 }
 
 function Duplex(options) {
@@ -20748,6 +21144,16 @@ function Duplex(options) {
   this.once('end', onend);
 }
 
+Object.defineProperty(Duplex.prototype, 'writableHighWaterMark', {
+  // making it explicit this property is not enumerable
+  // because otherwise some prototype manipulation in
+  // userland will fail
+  enumerable: false,
+  get: function () {
+    return this._writableState.highWaterMark;
+  }
+});
+
 // the no-half-open enforcer
 function onend() {
   // if we allow half-open state, or if the writable side ended,
@@ -20756,7 +21162,7 @@ function onend() {
 
   // no more data can be written.
   // But allow more writes to happen in this tick.
-  processNextTick(onEndNT, this);
+  pna.nextTick(onEndNT, this);
 }
 
 function onEndNT(self) {
@@ -20788,15 +21194,9 @@ Duplex.prototype._destroy = function (err, cb) {
   this.push(null);
   this.end();
 
-  processNextTick(cb, err);
+  pna.nextTick(cb, err);
 };
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-},{"./_stream_readable":84,"./_stream_writable":86,"core-util-is":11,"inherits":65,"process-nextick-args":79}],83:[function(require,module,exports){
+},{"./_stream_readable":87,"./_stream_writable":89,"core-util-is":11,"inherits":67,"process-nextick-args":82}],86:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -20844,7 +21244,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":85,"core-util-is":11,"inherits":65}],84:[function(require,module,exports){
+},{"./_stream_transform":88,"core-util-is":11,"inherits":67}],87:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -20871,7 +21271,7 @@ PassThrough.prototype._transform = function (chunk, encoding, cb) {
 
 /*<replacement>*/
 
-var processNextTick = require('process-nextick-args').nextTick;
+var pna = require('process-nextick-args');
 /*</replacement>*/
 
 module.exports = Readable;
@@ -21343,7 +21743,7 @@ function emitReadable(stream) {
   if (!state.emittedReadable) {
     debug('emitReadable', state.flowing);
     state.emittedReadable = true;
-    if (state.sync) processNextTick(emitReadable_, stream);else emitReadable_(stream);
+    if (state.sync) pna.nextTick(emitReadable_, stream);else emitReadable_(stream);
   }
 }
 
@@ -21362,7 +21762,7 @@ function emitReadable_(stream) {
 function maybeReadMore(stream, state) {
   if (!state.readingMore) {
     state.readingMore = true;
-    processNextTick(maybeReadMore_, stream, state);
+    pna.nextTick(maybeReadMore_, stream, state);
   }
 }
 
@@ -21407,7 +21807,7 @@ Readable.prototype.pipe = function (dest, pipeOpts) {
   var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
 
   var endFn = doEnd ? onend : unpipe;
-  if (state.endEmitted) processNextTick(endFn);else src.once('end', endFn);
+  if (state.endEmitted) pna.nextTick(endFn);else src.once('end', endFn);
 
   dest.on('unpipe', onunpipe);
   function onunpipe(readable, unpipeInfo) {
@@ -21597,7 +21997,7 @@ Readable.prototype.on = function (ev, fn) {
       state.readableListening = state.needReadable = true;
       state.emittedReadable = false;
       if (!state.reading) {
-        processNextTick(nReadingNextTick, this);
+        pna.nextTick(nReadingNextTick, this);
       } else if (state.length) {
         emitReadable(this);
       }
@@ -21628,7 +22028,7 @@ Readable.prototype.resume = function () {
 function resume(stream, state) {
   if (!state.resumeScheduled) {
     state.resumeScheduled = true;
-    processNextTick(resume_, stream, state);
+    pna.nextTick(resume_, stream, state);
   }
 }
 
@@ -21723,6 +22123,16 @@ Readable.prototype.wrap = function (stream) {
 
   return this;
 };
+
+Object.defineProperty(Readable.prototype, 'readableHighWaterMark', {
+  // making it explicit this property is not enumerable
+  // because otherwise some prototype manipulation in
+  // userland will fail
+  enumerable: false,
+  get: function () {
+    return this._readableState.highWaterMark;
+  }
+});
 
 // exposed for testing purposes only.
 Readable._fromList = fromList;
@@ -21836,7 +22246,7 @@ function endReadable(stream) {
 
   if (!state.endEmitted) {
     state.ended = true;
-    processNextTick(endReadableNT, state, stream);
+    pna.nextTick(endReadableNT, state, stream);
   }
 }
 
@@ -21849,12 +22259,6 @@ function endReadableNT(state, stream) {
   }
 }
 
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-
 function indexOf(xs, x) {
   for (var i = 0, l = xs.length; i < l; i++) {
     if (xs[i] === x) return i;
@@ -21862,7 +22266,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":82,"./internal/streams/BufferList":87,"./internal/streams/destroy":88,"./internal/streams/stream":89,"_process":80,"core-util-is":11,"events":47,"inherits":65,"isarray":71,"process-nextick-args":79,"safe-buffer":95,"string_decoder/":97,"util":8}],85:[function(require,module,exports){
+},{"./_stream_duplex":85,"./internal/streams/BufferList":90,"./internal/streams/destroy":91,"./internal/streams/stream":92,"_process":83,"core-util-is":11,"events":48,"inherits":67,"isarray":73,"process-nextick-args":82,"safe-buffer":98,"string_decoder/":100,"util":8}],88:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -22077,7 +22481,7 @@ function done(stream, er, data) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":82,"core-util-is":11,"inherits":65}],86:[function(require,module,exports){
+},{"./_stream_duplex":85,"core-util-is":11,"inherits":67}],89:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -22108,7 +22512,7 @@ function done(stream, er, data) {
 
 /*<replacement>*/
 
-var processNextTick = require('process-nextick-args').nextTick;
+var pna = require('process-nextick-args');
 /*</replacement>*/
 
 module.exports = Writable;
@@ -22135,7 +22539,7 @@ function CorkedRequest(state) {
 /* </replacement> */
 
 /*<replacement>*/
-var asyncWrite = !process.browser && ['v0.10', 'v0.9.'].indexOf(process.version.slice(0, 5)) > -1 ? setImmediate : processNextTick;
+var asyncWrite = !process.browser && ['v0.10', 'v0.9.'].indexOf(process.version.slice(0, 5)) > -1 ? setImmediate : pna.nextTick;
 /*</replacement>*/
 
 /*<replacement>*/
@@ -22369,7 +22773,7 @@ function writeAfterEnd(stream, cb) {
   var er = new Error('write after end');
   // TODO: defer error events consistently everywhere, not just the cb
   stream.emit('error', er);
-  processNextTick(cb, er);
+  pna.nextTick(cb, er);
 }
 
 // Checks that a user-supplied chunk is valid, especially for the particular
@@ -22386,7 +22790,7 @@ function validChunk(stream, state, chunk, cb) {
   }
   if (er) {
     stream.emit('error', er);
-    processNextTick(cb, er);
+    pna.nextTick(cb, er);
     valid = false;
   }
   return valid;
@@ -22449,6 +22853,16 @@ function decodeChunk(state, chunk, encoding) {
   return chunk;
 }
 
+Object.defineProperty(Writable.prototype, 'writableHighWaterMark', {
+  // making it explicit this property is not enumerable
+  // because otherwise some prototype manipulation in
+  // userland will fail
+  enumerable: false,
+  get: function () {
+    return this._writableState.highWaterMark;
+  }
+});
+
 // if we're already writing something, then just put this
 // in the queue, and wait our turn.  Otherwise, call _write
 // If we return false, then we need a drain event, so set that flag.
@@ -22506,10 +22920,10 @@ function onwriteError(stream, state, sync, er, cb) {
   if (sync) {
     // defer the callback if we are being called synchronously
     // to avoid piling up things on the stack
-    processNextTick(cb, er);
+    pna.nextTick(cb, er);
     // this can emit finish, and it will always happen
     // after error
-    processNextTick(finishMaybe, stream, state);
+    pna.nextTick(finishMaybe, stream, state);
     stream._writableState.errorEmitted = true;
     stream.emit('error', er);
   } else {
@@ -22684,7 +23098,7 @@ function prefinish(stream, state) {
     if (typeof stream._final === 'function') {
       state.pendingcb++;
       state.finalCalled = true;
-      processNextTick(callFinal, stream, state);
+      pna.nextTick(callFinal, stream, state);
     } else {
       state.prefinished = true;
       stream.emit('prefinish');
@@ -22708,7 +23122,7 @@ function endWritable(stream, state, cb) {
   state.ending = true;
   finishMaybe(stream, state);
   if (cb) {
-    if (state.finished) processNextTick(cb);else stream.once('finish', cb);
+    if (state.finished) pna.nextTick(cb);else stream.once('finish', cb);
   }
   state.ended = true;
   stream.writable = false;
@@ -22757,7 +23171,7 @@ Writable.prototype._destroy = function (err, cb) {
   cb(err);
 };
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./_stream_duplex":82,"./internal/streams/destroy":88,"./internal/streams/stream":89,"_process":80,"core-util-is":11,"inherits":65,"process-nextick-args":79,"safe-buffer":95,"util-deprecate":99}],87:[function(require,module,exports){
+},{"./_stream_duplex":85,"./internal/streams/destroy":91,"./internal/streams/stream":92,"_process":83,"core-util-is":11,"inherits":67,"process-nextick-args":82,"safe-buffer":98,"util-deprecate":102}],90:[function(require,module,exports){
 'use strict';
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -22837,12 +23251,12 @@ if (util && util.inspect && util.inspect.custom) {
     return this.constructor.name + ' ' + obj;
   };
 }
-},{"safe-buffer":95,"util":8}],88:[function(require,module,exports){
+},{"safe-buffer":98,"util":8}],91:[function(require,module,exports){
 'use strict';
 
 /*<replacement>*/
 
-var processNextTick = require('process-nextick-args').nextTick;
+var pna = require('process-nextick-args');
 /*</replacement>*/
 
 // undocumented cb() API, needed for core, not for public API
@@ -22856,7 +23270,7 @@ function destroy(err, cb) {
     if (cb) {
       cb(err);
     } else if (err && (!this._writableState || !this._writableState.errorEmitted)) {
-      processNextTick(emitErrorNT, this, err);
+      pna.nextTick(emitErrorNT, this, err);
     }
     return this;
   }
@@ -22875,7 +23289,7 @@ function destroy(err, cb) {
 
   this._destroy(err || null, function (err) {
     if (!cb && err) {
-      processNextTick(emitErrorNT, _this, err);
+      pna.nextTick(emitErrorNT, _this, err);
       if (_this._writableState) {
         _this._writableState.errorEmitted = true;
       }
@@ -22912,13 +23326,13 @@ module.exports = {
   destroy: destroy,
   undestroy: undestroy
 };
-},{"process-nextick-args":79}],89:[function(require,module,exports){
+},{"process-nextick-args":82}],92:[function(require,module,exports){
 module.exports = require('events').EventEmitter;
 
-},{"events":47}],90:[function(require,module,exports){
+},{"events":48}],93:[function(require,module,exports){
 module.exports = require('./readable').PassThrough
 
-},{"./readable":91}],91:[function(require,module,exports){
+},{"./readable":94}],94:[function(require,module,exports){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = exports;
 exports.Readable = exports;
@@ -22927,13 +23341,13 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-},{"./lib/_stream_duplex.js":82,"./lib/_stream_passthrough.js":83,"./lib/_stream_readable.js":84,"./lib/_stream_transform.js":85,"./lib/_stream_writable.js":86}],92:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":85,"./lib/_stream_passthrough.js":86,"./lib/_stream_readable.js":87,"./lib/_stream_transform.js":88,"./lib/_stream_writable.js":89}],95:[function(require,module,exports){
 module.exports = require('./readable').Transform
 
-},{"./readable":91}],93:[function(require,module,exports){
+},{"./readable":94}],96:[function(require,module,exports){
 module.exports = require('./lib/_stream_writable.js');
 
-},{"./lib/_stream_writable.js":86}],94:[function(require,module,exports){
+},{"./lib/_stream_writable.js":89}],97:[function(require,module,exports){
 !function(e,_){if("object"==typeof exports&&"object"==typeof module)module.exports=_(require("jquery"));else if("function"==typeof define&&define.amd)define(["jquery"],_);else{var a=_("object"==typeof exports?require("jquery"):e.jquery);for(var o in a)("object"==typeof exports?exports:e)[o]=a[o]}}(this,function(e){return function(e){function _(o){if(a[o])return a[o].exports;var s=a[o]={exports:{},id:o,loaded:!1};return e[o].call(s.exports,s,s.exports,_),s.loaded=!0,s.exports}var a={};return _.m=e,_.c=a,_.p="",_(0)}([function(e,_,a){"use strict";function o(e){return e&&e.__esModule?e:{default:e}}function s(e,_){if(!(e instanceof _))throw new TypeError("Cannot call a class as a function")}Object.defineProperty(_,"__esModule",{value:!0});var t="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},i=function(){function e(e,_){for(var a=0;a<_.length;a++){var o=_[a];o.enumerable=o.enumerable||!1,o.configurable=!0,"value"in o&&(o.writable=!0),Object.defineProperty(e,o.key,o)}}return function(_,a,o){return a&&e(_.prototype,a),o&&e(_,o),_}}(),m=a(1),r=o(m),f=a(2),g=o(f),n=a(6),h=o(n),l=a(3),d=o(l),p=a(13),c=o(p),w=a(15),u=o(w),E=a(5),b=o(E),I=a(16),O=o(I),A=a(17),T=o(A);a(8);var R=function(){function e(){var _=this,a=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;s(this,e),this._callback=void 0,this.defaults=Object.assign({},b.default),"object"===("undefined"==typeof a?"undefined":t(a))&&this._setDefaults(a),"function"==typeof a&&(this._callback=a),this.categories=this._getCategories(),this.$picker=this._getPicker(),this.$active_title=this.$picker.find("#active-title"),this.$preview_emoji=this.$picker.find("#emoji-large-preview"),this.$preview_name=this.$picker.find("#emoji-name"),this.$preview_colon=this.$picker.find("#colon-display"),this.$content=this.$picker.find(".emoji-content"),this.$default_footer=this.$picker.find(".default-content"),this.$preview=this.$picker.find(".emoji-preview"),this.$search=this.$picker.find(".search-emojis"),this._icon=void 0,this._container=void 0,this._input=void 0,this.editor=void 0;var o=!1;Object.defineProperty(this,"picker_open",{get:function(){return o},set:function(e){e!==o&&(o=e,o||_.$picker.detach())}});var i=void 0;Object.defineProperty(this,"active_category",{get:function(){return i},set:function(e){(!i||e instanceof h.default&&e.title!==i.title)&&(i=e,_.setActiveCategory())}});var m=void 0;Object.defineProperty(this,"active_emoji",{get:function(){return m},set:function(e){m&&e&&e.full_name===m.full_name||(m=e,_._updatePreview())}}),this.active_category=this.categories[0],this._onScroll()._onCatClick()._onSearch()._setCategoryTooltips()}return i(e,[{key:"listenOn",value:function(e,_,a){this._removeOldEvents(),this._icon=e,this._container=_,this._input=a,this.editor=new g.default(a,this.defaults.prevent_new_line),this._onIconClick()}},{key:"openPicker",value:function(e){var _=new c.default(this._icon,this._container,this.$picker);if(_.center(),"function"==typeof this.defaults.positioning)this.defaults.positioning(_);else switch(this.defaults.positioning){case"autoplace":_.autoPlace(43,10);break;case"vertical":_.autoPlaceVertically(10);break;case"horizontal":_.autoPlaceHorizontally(10);break;default:_.autoPlace(43,10)}return this._onTooltipClick(_,e),this.$content.get(0).scrollTop=this.active_category.offset_top,this}},{key:"getText",value:function(){if(this.editor)return this.editor.getText();throw new Error("Did you call this listenOn method first? The listenOn method constructs an instance of EmojiEditor and it appears to be undefined.")}},{key:"emptyInput",value:function(){this.editor?this.editor.empty():console.log("Did you call the listenOn method first? The EmojiEditor instance is undefined.")}},{key:"setActiveCategory",value:function(){var e=this;return this.$picker.find(".select-category").each(function(){var _=this.getAttribute("data-name");_===e.active_category.title?(this.classList.add("active"),e.$active_title.text(e.active_category.title)):this.classList.remove("active")}),this}},{key:"getCategory",value:function(e){return this.categories.find(function(_){return _.title===e})}},{key:"getEmoji",value:function(e){var _=arguments.length>1&&void 0!==arguments[1]?arguments[1]:void 0;return _?_.emojis.find(function(_){return _.full_name===e}):this.categories.find(function(_){return _.emojis.find(function(_){return _.full_name===e})})}},{key:"_setDefaults",value:function(e){var _=this,a=Object.keys(e);a.forEach(function(a){_.defaults.hasOwnProperty(a)&&(_.defaults[a]=e[a])}),this.defaults.use_sheets&&d.default.setSheets(this.defaults.sheets)}},{key:"_dispatchBubble",value:function(e,_,a){var o=b.default.events;switch(e){case o.SELECTED:this._handleSelection(_,a);break;case o.EMOJI_MOUSEENTER:this.active_emoji=_;break;case o.EMOJI_MOUSELEAVE:this.active_emoji=void 0}}},{key:"_handleSelection",value:function(e,_){var a=this.editor.placeEmoji(e);"function"==typeof this._callback&&this._callback(e,_,a),"function"==typeof this.defaults.callback&&this.defaults.callback(e,_,a),this.picker_open=!1,this.active_emoji=void 0}},{key:"_getCategories",value:function(){var e=this,_=this.defaults.categories.map(function(_){return h.default.factory(_,u.default[_.title],e._dispatchBubble.bind(e))});return _[0].$category.addClass("first"),_}},{key:"_getPicker",value:function(){var e=(0,r.default)((0,O.default)({default_content:b.default.default_footer_message,categories:this.categories.map(function(e){return e.exportContents()}),search_icon:this.defaults.search_icon})),_=e.find(".emoji-content");return this.categories.forEach(function(e){_.append(e.getMarkup())}),e}},{key:"_setCategoryTooltips",value:function(){var e=this;return this.$picker&&this.defaults.show_icon_tooltips&&!function(){var _=e.$picker.find(".select-category"),a=e,o=void 0;_.off("mouseenter.emoji").on("mouseenter.emoji",function(e){var _=this.getAttribute("data-name");o=new c.default(this,a.$picker.get(0),(0,r.default)((0,T.default)({text:_}))),o.below()}).off("mouseleave.emoji").on("mouseleave.emoji",function(){o.destroy()})}(),this}},{key:"_removeOldEvents",value:function(){return this._icon&&(0,r.default)(this._icon).off("click.emoji-picker"),this}},{key:"_onIconClick",value:function(){var e=this;return(0,r.default)(this._icon).off("click.emoji").on("click.emoji",function(_){e.picker_open||e.openPicker(_),e.picker_open=!e.picker_open}),this}},{key:"_onTooltipClick",value:function(e,_){var a=this;e.setClickCallback(_,function(e,_){var o=(0,r.default)(e).closest("#emoji-picker"),s=(0,r.default)(e).is(a._icon);o.length||s||(a.picker_open=!1)})}},{key:"_onScroll",value:function(){var e=this;return this.$content.off("scroll.emoji").on("scroll.emoji",function(_){e.active_category=e._getActiveCategory()}),this}},{key:"_onCatClick",value:function(){var e=this;return this.$picker.find(".select-category").off("click.emoji").on("click.emoji",function(){var _=e.getCategory(this.getAttribute("data-name"));e.$content.get(0).scrollTop=_.offset_top,e.active_category=e._getActiveCategory()}),this}},{key:"_onSearch",value:function(){var e=this;return this.$search.off("input.emoji").on("input.emoji",function(){var _=e.$search.val().trim();e.categories.forEach(function(e){return e.search_term=_}),e.$active_title.text("Results for: "+_),0===_.length&&(e.active_category=e._getActiveCategory(),e.setActiveCategory())}),this}},{key:"_getActiveCategory",value:function(){for(var e=this.$content.get(0).scrollTop,_=this.categories[0],a=0;a<this.categories.length;a++){if(this.categories[a].offset_top>e)return _;_=this.categories[a]}return this.categories[this.categories.length-1]}},{key:"_updatePreview",value:function(){var e=this.active_emoji;e?(this.$default_footer.hide(),this.$preview_emoji.html(e.getPreview()),this.$preview_name.text(e.short_name),this.defaults.show_colon_preview?(this.$preview_colon.text(e.getColons()),this.$preview_name.removeClass("name-only")):this.$preview_name.addClass("name-only"),this.$preview.show()):(this.$preview.hide(),this.$default_footer.show())}}],[{key:"render",value:function(e){var _=d.default.withEnvironment();return d.default.is_mobile?_.replace_colons(e):_.replace_unified(_.replace_colons(e))}},{key:"setSheets",value:function(){var e=arguments.length>0&&void 0!==arguments[0]?arguments[0]:void 0;e=e||b.default.sheets,d.default.setSheets(e)}}]),e}();_.default=R},function(_,a){_.exports=e},function(e,_,a){"use strict";function o(e){return e&&e.__esModule?e:{default:e}}function s(e,_){if(!(e instanceof _))throw new TypeError("Cannot call a class as a function")}Object.defineProperty(_,"__esModule",{value:!0});var t=function(){function e(e,_){for(var a=0;a<_.length;a++){var o=_[a];o.enumerable=o.enumerable||!1,o.configurable=!0,"value"in o&&(o.writable=!0),Object.defineProperty(e,o.key,o)}}return function(_,a,o){return a&&e(_.prototype,a),o&&e(_,o),_}}(),i=a(1),m=o(i),r=a(3),f=o(r),g=function(){function e(_){var a=arguments.length>1&&void 0!==arguments[1]&&arguments[1];s(this,e),this._input=_,this._is_content_editable=this.isContentEditable(_),this.cursor_position=void 0,this.prevent_new_line=a,this._trackCursor(),this._onPaste()}return t(e,[{key:"isContentEditable",value:function(e){var _=e.nodeName;return e.isContentEditable&&"INPUT"!==_&&"TEXTAREA"!==_}},{key:"placeEmoji",value:function(_){if(this._input.focus(),this.cursor_position&&e.restoreSelection(this.cursor_position),this._is_content_editable){var a=void 0;return e.supportsUnified()?(a=e.pasteTextAtCaret(_.getCharacter()),e.selectElement(a),this.cursor_position=e.saveSelection()):(a=e.pasteHtml(_.getHtml()),this.cursor_position=e.saveSelection()),(0,m.default)(this._input).trigger("change").trigger("input"),a}var o=this.pasteInputText(_.getColons());return(0,m.default)(this._input).trigger("change").trigger("input"),o}},{key:"pasteInputText",value:function(e){var _=this._input.selectionStart,a=this._input.value.length;return this._input.value=this._input.value.substr(0,_)+e+this._input.value.substr(_),this.setInputCaretPosition(_+this._input.value.length-a),e}},{key:"setInputCaretPosition",value:function(e){if(this._input.createTextRange){var _=this._input.createTextRange();return _.move("character",e),_.select(),!0}return this._input.selectionStart||0===this._input.selectionStart?(this._input.focus(),this._input.setSelectionRange(e,e),!0):(this._input.focus(),!1)}},{key:"getText",value:function(){return this._is_content_editable?this._mapElement(this._input).replace(/[\u200B-\u200D\uFEFF]/g,""):f.default.withUnified().replace_colons(this._input.value)}},{key:"empty",value:function(){this._is_content_editable?this._input.innerHTML="":this._input.value=""}},{key:"_onPaste",value:function(){return this._is_content_editable&&(0,m.default)(this._input).off("paste.editable").on("paste.editable",function(_){_.stopPropagation(),_.preventDefault();var a=_.originalEvent.clipboardData||window.clipboardData,o=a.getData("text"),s=e.pasteTextAtCaret(o);e.selectElement(s)}),this}},{key:"getNodes",value:function(){return Array.prototype.slice.call(this._input.childNodes)}},{key:"selectLastNode",value:function(){var _=this.getNodes();_.length&&(e.selectElement(_[_.length-1]),this.cursor_position=e.saveSelection())}},{key:"_mapElement",value:function(_){var a=this,o=Array.prototype.slice.call(_.childNodes);return o.map(function(_){var o=_ instanceof Text,s=_ instanceof HTMLElement;return o?_.textContent:s&&"SPAN"===_.tagName?e._extractSpan(_):s&&"IMG"===_.tagName?e._extractImage(_):s&&"BR"===_.tagName?"\n":s?a._mapElement(_):""}).join("")}},{key:"_trackCursor",value:function(){var _=this;return this._is_content_editable&&((0,m.default)(this._input).off("keyup.emoji mouseup.emoji").on("keyup.emoji mouseup.emoji",function(){_.cursor_position=e.saveSelection()}),(0,m.default)(this._input).off("keydown.emoji").on("keydown.emoji",function(e){13===e.which&&_.prevent_new_line&&e.preventDefault()})),this}},{key:"replaceUnified",value:function(){if(!this._is_content_editable)throw new Error("The replaceUnified method should only be called on contenteditable elements.");var _=f.default.withEnvironment(),a=_.replace_unified(this._input.innerHTML);e.selectElementContents(this._input);var o=e.pasteHtml(a);o&&e.selectElement(o)}}],[{key:"_extractSpan",value:function(_){var a=(0,m.default)(_),o=a.find(".emoji-inner");if(!o.length)return"";try{var s=o.data("codepoints");return e.parseCodepoints(s)}catch(e){return""}}},{key:"_extractImage",value:function(_){return _.hasAttribute("data-codepoints")?e.parseCodepoints(_.getAttribute("data-codepoints")):""}},{key:"parseCodepoints",value:function(e){if(/-/g.test(e)){var _=e.split("-"),a="0x"+_[0],o="0x"+_[1];return String.fromCodePoint(a,o)}return String.fromCodePoint("0x"+e)}},{key:"supportsUnified",value:function(){return"unified"===f.default.withEnvironment().replace_mode}},{key:"pasteHtml",value:function(_){return e.pasteHtmlAtCaret(_+"&#8203;")}},{key:"saveSelection",value:function(){if(window.getSelection){var e=window.getSelection();if(e.getRangeAt&&e.rangeCount)return e.getRangeAt(0)}else if(document.selection&&document.selection.createRange)return document.selection.createRange();return null}},{key:"restoreSelection",value:function(e){if(e)if(window.getSelection){var _=window.getSelection();_.removeAllRanges(),_.addRange(e)}else document.selection&&e.select&&e.select()}},{key:"pasteTextAtCaret",value:function(e){var _=void 0,a=void 0,o=document.createTextNode(e);return window.getSelection?(_=window.getSelection(),_.getRangeAt&&_.rangeCount&&(a=_.getRangeAt(0),a.deleteContents(),a.insertNode(o))):document.selection&&document.selection.createRange&&(document.selection.createRange().text=o.textContent),o}},{key:"selectElement",value:function(e){var _=arguments.length>1&&void 0!==arguments[1]&&arguments[1];if(window.getSelection){var a=window.getSelection();a.removeAllRanges();var o=document.createRange();o.selectNodeContents(e),_||o.collapse(!1),a.addRange(o)}else if(document.selection){var s=document.body.createTextRange();s.moveToElementText(e),s.select()}}},{key:"pasteHtmlAtCaret",value:function(e,_){var a=void 0,o=void 0;if(window.getSelection){if(a=window.getSelection(),a.getRangeAt&&a.rangeCount){o=a.getRangeAt(0),o.deleteContents();var s=document.createElement("div");s.innerHTML=e;for(var t=document.createDocumentFragment(),i=void 0,m=void 0;i=s.firstChild;)m=t.appendChild(i);var r=t.firstChild;return o.insertNode(t),m&&(o=o.cloneRange(),o.setStartAfter(m),_?o.setStartBefore(r):o.collapse(!1),a.removeAllRanges(),a.addRange(o)),r}}else if((a=document.selection)&&"Control"!=a.type){var f=a.createRange();f.collapse(!0),a.createRange().pasteHTML(e),_&&(o=a.createRange(),o.setEndPoint("StartToStart",f),o.select())}}},{key:"selectElementContents",value:function(e){var _=document.createRange();_.selectNodeContents(e);var a=window.getSelection();a.removeAllRanges(),a.addRange(_)}}]),e}();_.default=g},function(e,_,a){"use strict";function o(e){return e&&e.__esModule?e:{default:e}}function s(e,_){if(!(e instanceof _))throw new TypeError("Cannot call a class as a function")}Object.defineProperty(_,"__esModule",{value:!0});var t=function(){function e(e,_){for(var a=0;a<_.length;a++){var o=_[a];o.enumerable=o.enumerable||!1,o.configurable=!0,"value"in o&&(o.writable=!0),Object.defineProperty(e,o.key,o)}}return function(_,a,o){return a&&e(_.prototype,a),o&&e(_,o),_}}(),i=a(4),m=o(i),r=a(5),f=o(r),g=function(){function e(){s(this,e),this.unicode=e.unified,this.env=e.environment,this.css=e.image,this.is_mobile=e.deviceIsMobile,f.default.use_sheets&&this.setSheets(f.default.sheets)}return t(e,null,[{key:"factory",value:function(){return new e}}]),t(e,[{key:"setSheets",value:function(e){e=e||f.default.sheets,[this.withEnvironment(),this.withImage()].forEach(function(_){_.img_sets.apple.sheet=e.apple,_.img_sets.google.sheet=e.google,_.img_sets.twitter.sheet=e.twitter,_.img_sets.emojione.sheet=e.emojione,_.use_sheet=!0})}},{key:"withUnified",value:function(){return this.unicode}},{key:"withEnvironment",value:function(){return this.env}},{key:"withImage",value:function(){return this.css}},{key:"canSupportUnified",value:function(){return"unified"===this.env.replace_mode}}],[{key:"unified",get:function(){var e=new m.default;return e.init_unified(),e}},{key:"environment",get:function(){var _=new m.default;return _.init_env(),"img"===_.replace_mode||"css"===_.replace_mode?e.image:_}},{key:"image",get:function(){var e=new m.default;return e.init_env(),e.replace_mode="css",e.supports_css=!0,e}},{key:"deviceIsMobile",get:function(){var e=!1;return function(_){(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino/i.test(_)||/1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(_.substr(0,4)))&&(e=!0)}(navigator.userAgent||navigator.vendor||window.opera),e}}]),e}();_.default=new g},function(e,_,a){(function(a){"use strict";var o="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e};(function(){var a=this,s=a.EmojiConvertor,t=function(){var e=this;return e.img_set="apple",e.img_sets={apple:{path:"/emoji-data/img-apple-64/",sheet:"/emoji-data/sheet_apple_64.png",mask:1},google:{path:"/emoji-data/img-google-64/",sheet:"/emoji-data/sheet_google_64.png",mask:2},twitter:{path:"/emoji-data/img-twitter-64/",sheet:"/emoji-data/sheet_twitter_64.png",mask:4},emojione:{path:"/emoji-data/img-emojione-64/",sheet:"/emoji-data/sheet_emojione_64.png",mask:8},facebook:{path:"/emoji-data/img-facebook-64/",sheet:"/emoji-data/sheet_facebook_64.png",mask:16},messenger:{path:"/emoji-data/img-messenger-64/",sheet:"/emoji-data/sheet_messenger_64.png",mask:32}},e.use_css_imgs=!1,e.colons_mode=!1,e.text_mode=!1,e.include_title=!1,e.include_text=!1,e.allow_native=!0,e.use_sheet=!1,e.avoid_ms_emoji=!0,e.allow_caps=!1,e.img_suffix="",e.inits={},e.map={},e.init_env(),e};t.prototype.noConflict=function(){return a.EmojiConvertor=s,t},t.prototype.replace_emoticons=function(e){var _=this,a=_.replace_emoticons_with_colons(e);return _.replace_colons(a)},t.prototype.replace_emoticons_with_colons=function(e){var _=this;_.init_emoticons();var a=0,o=[],s=e.replace(_.rx_emoticons,function(s,t,i,m){var r=a;a=m+s.length;var f=i.indexOf("(")!==-1,g=i.indexOf(")")!==-1;if((f||g)&&o.indexOf(i)==-1&&o.push(i),g&&!f){var n=e.substring(r,m);if(n.indexOf("(")!==-1&&n.indexOf(")")===-1)return s}if("\n8)"===s){var h=e.substring(0,m);if(/\n?(6\)|7\))/.test(h))return s}var l=_.data[_.map.emoticons[i]][3][0];return l?t+":"+l+":":s});if(o.length){var t=o.map(_.escape_rx),i=new RegExp("(\\(.+)("+t.join("|")+")(.+\\))","g");s=s.replace(i,function(e,a,o,s){var t=_.data[_.map.emoticons[o]][3][0];return t?a+":"+t+":"+s:e})}return s},t.prototype.replace_colons=function(e){var _=this;return _.init_colons(),e.replace(_.rx_colons,function(e){var a=e.substr(1,e.length-2);if(_.allow_caps&&(a=a.toLowerCase()),a.indexOf("::skin-tone-")>-1){var o=a.substr(-1,1),s="skin-tone-"+o,t=_.map.colons[s];a=a.substr(0,a.length-13);var i=_.map.colons[a];return i?_.replacement(i,a,":",{idx:t,actual:s,wrapper:":"}):":"+a+":"+_.replacement(t,s,":")}var i=_.map.colons[a];return i?_.replacement(i,a,":"):e})},t.prototype.replace_unified=function(e){var _=this;return _.init_unified(),e.replace(_.rx_unified,function(e,a,o){var s=_.map.unified[a];if(s){var t=null;return"🏻"==o&&(t="1f3fb"),"🏼"==o&&(t="1f3fc"),"🏽"==o&&(t="1f3fd"),"🏾"==o&&(t="1f3fe"),"🏿"==o&&(t="1f3ff"),t?_.replacement(s,null,null,{idx:t,actual:o,wrapper:""}):_.replacement(s)}return s=_.map.unified_vars[a],s?_.replacement(s[0],null,null,{idx:s[1],actual:"",wrapper:""}):e})},t.prototype.addAliases=function(e){var _=this;_.init_colons();for(var a in e)_.map.colons[a]=e[a]},t.prototype.removeAliases=function(e){for(var _=this,a=0;a<e.length;a++){var o=e[a];delete _.map.colons[o];e:for(var s in _.data)for(var t=0;t<_.data[s][3].length;t++)if(o==_.data[s][3][t]){_.map.colons[o]=s;break e}}},t.prototype.replacement=function(e,_,a,s){var t=this,i="",m=null;if("object"===("undefined"==typeof s?"undefined":o(s))&&(i=t.replacement(s.idx,s.actual,s.wrapper),m=s.idx),a=a||"",t.colons_mode)return":"+t.data[e][3][0]+":"+i;var r=_?a+_+a:t.data[e][8]||a+t.data[e][3][0]+a;if(t.text_mode)return r+i;if(t.init_env(),"unified"==t.replace_mode&&t.allow_native&&t.data[e][0][0])return t.data[e][0][0]+i;if("softbank"==t.replace_mode&&t.allow_native&&t.data[e][1])return t.data[e][1]+i;if("google"==t.replace_mode&&t.allow_native&&t.data[e][2])return t.data[e][2]+i;var f=t.find_image(e,m),g=t.include_title?' title="'+(_||t.data[e][3][0])+'"':"",n=t.include_text?a+(_||t.data[e][3][0])+a:"";if(t.data[e][7]&&(f.path=t.data[e][7],f.px=null,f.py=null,f.is_var=!1),f.is_var&&(i="",t.include_text&&s&&s.actual&&s.wrapper&&(n+=s.wrapper+s.actual+s.wrapper)),t.supports_css){if(t.use_sheet&&null!=f.px&&null!=f.py){var h=100/(t.sheet_size-1),l="background: url("+f.sheet+");background-position:"+h*f.px+"% "+h*f.py+"%;background-size:"+t.sheet_size+"00%";return'<span class="emoji-outer emoji-sizer"><span class="emoji-inner" style="'+l+'"'+g+' data-codepoints="'+f.full_idx+'">'+n+"</span></span>"+i}return t.use_css_imgs?'<span class="emoji emoji-'+e+'"'+g+' data-codepoints="'+f.full_idx+'">'+n+"</span>"+i:'<span class="emoji emoji-sizer" style="background-image:url('+f.path+')"'+g+' data-codepoints="'+f.full_idx+'">'+n+"</span>"+i}return'<img src="'+f.path+'" class="emoji" data-codepoints="'+f.full_idx+'" '+g+"/>"+i},t.prototype.find_image=function(e,_){var a=this,o={path:"",sheet:"",px:a.data[e][4],py:a.data[e][5],full_idx:e,is_var:!1},s=a.data[e][6];if(_&&a.variations_data[e]&&a.variations_data[e][_]){var t=a.variations_data[e][_];o.px=t[1],o.py=t[2],o.full_idx=t[0],o.is_var=!0,s=t[3]}for(var i=[a.img_set,"apple","emojione","google","twitter","facebook","messenger"],m=0;m<i.length;m++){if(s&a.img_sets[i[m]].mask)return o.path=a.img_sets[i[m]].path+o.full_idx+".png"+a.img_suffix,o.sheet=a.img_sets[a.img_set].sheet,o;if(a.obsoletes_data[o.full_idx]){var r=a.obsoletes_data[o.full_idx];if(r[3]&a.img_sets[i[m]].mask)return o.path=a.img_sets[i[m]].path+r[0]+".png"+a.img_suffix,o.sheet=a.img_sets[i[m]].sheet,o.px=r[1],o.py=r[2],o}}return o},t.prototype.init_emoticons=function(){var e=this;if(!e.inits.emoticons){e.init_colons(),e.inits.emoticons=1;var _=[];e.map.emoticons={};for(var a in e.emoticons_data){var o=a.replace(/\&/g,"&amp;").replace(/\</g,"&lt;").replace(/\>/g,"&gt;");e.map.colons[e.emoticons_data[a]]&&(e.map.emoticons[o]=e.map.colons[e.emoticons_data[a]],_.push(e.escape_rx(o)))}e.rx_emoticons=new RegExp("(^|\\s)("+_.join("|")+")(?=$|[\\s|\\?\\.,!])","g")}},t.prototype.init_colons=function(){var e=this;if(!e.inits.colons){e.inits.colons=1,e.rx_colons=new RegExp(":[a-zA-Z0-9-_+]+:(:skin-tone-[2-6]:)?","g"),e.map.colons={};for(var _ in e.data)for(var a=0;a<e.data[_][3].length;a++)e.map.colons[e.data[_][3][a]]=_}},t.prototype.init_unified=function(){var e=this;if(!e.inits.unified){e.inits.unified=1;var _=[];e.map.unified={},e.map.unified_vars={};for(var a in e.data)for(var o=0;o<e.data[a][0].length;o++)_.push(e.data[a][0][o].replace("*","\\*")),e.map.unified[e.data[a][0][o]]=a;for(var a in e.variations_data)if(e.variations_data[a]["1f3fb"][0]!=a+"-1f3fb")for(var s in e.variations_data[a])for(var o=0;o<e.variations_data[a][s][4].length;o++)_.push(e.variations_data[a][s][4][o].replace("*","\\*")),e.map.unified_vars[e.variations_data[a][s][4][o]]=[a,s];_=_.sort(function(e,_){return _.length-e.length}),e.rx_unified=new RegExp("("+_.join("|")+")(�[�-�])?","g")}},t.prototype.init_env=function(){var e=this;if(!e.inits.env){if(e.inits.env=1,e.replace_mode="img",e.supports_css=!1,"undefined"!=typeof navigator){var _=navigator.userAgent;if(window.getComputedStyle)try{var a=window.getComputedStyle(document.body);(a["background-size"]||a.backgroundSize)&&(e.supports_css=!0)}catch(a){_.match(/Firefox/i)&&(e.supports_css=!0)}if(_.match(/(iPhone|iPod|iPad|iPhone\s+Simulator)/i)){if(_.match(/OS\s+[12345]/i))return void(e.replace_mode="softbank");if(_.match(/OS\s+[6789]/i))return void(e.replace_mode="unified")}if(_.match(/Mac OS X 10[._ ](?:[789]|1\d)/i))return void(e.replace_mode="unified");if(!e.avoid_ms_emoji&&(_.match(/Windows NT 6.[1-9]/i)||_.match(/Windows NT 10.[0-9]/i))&&!_.match(/Chrome/i)&&!_.match(/MSIE 8/i))return void(e.replace_mode="unified")}e.supports_css&&(e.replace_mode="css")}},t.prototype.escape_rx=function(e){return e.replace(/[-[\]{}()*+?.,\\^$|#\s]/g,"\\$&")},t.prototype.sheet_size=49,t.prototype.data={"00a9":[["©️","©"],"","󾬩",["copyright"],0,0,11,0],"00ae":[["®️","®"],"","󾬭",["registered"],0,1,11,0],"203c":[["‼️","‼"],"","󾬆",["bangbang"],0,2,63,0],2049:[["⁉️","⁉"],"","󾬅",["interrobang"],0,3,63,0],2122:[["™️","™"],"","󾬪",["tm"],0,4,63,0],2139:[["ℹ️","ℹ"],"","󾭇",["information_source"],0,5,63,0],2194:[["↔️","↔"],"","󾫶",["left_right_arrow"],0,6,63,0],2195:[["↕️","↕"],"","󾫷",["arrow_up_down"],0,7,63,0],2196:[["↖️","↖"],"","󾫲",["arrow_upper_left"],0,8,63,0],2197:[["↗️","↗"],"","󾫰",["arrow_upper_right"],0,9,63,0],2198:[["↘️","↘"],"","󾫱",["arrow_lower_right"],0,10,63,0],2199:[["↙️","↙"],"","󾫳",["arrow_lower_left"],0,11,63,0],"21a9":[["↩️","↩"],"","󾮃",["leftwards_arrow_with_hook"],0,12,63,0],"21aa":[["↪️","↪"],"","󾮈",["arrow_right_hook"],0,13,63,0],"231a":[["⌚️","⌚"],"","󾀝",["watch"],0,14,63,0],"231b":[["⌛️","⌛"],"","󾀜",["hourglass"],0,15,63,0],2328:[["⌨️","⌨"],"","",["keyboard"],0,16,31,0],"23cf":[["⏏"],"","",["eject"],0,17,30,0],"23e9":[["⏩"],"","󾫾",["fast_forward"],0,18,63,0],"23ea":[["⏪"],"","󾫿",["rewind"],0,19,63,0],"23eb":[["⏫"],"","󾬃",["arrow_double_up"],0,20,63,0],"23ec":[["⏬"],"","󾬂",["arrow_double_down"],0,21,63,0],"23ed":[["⏭"],"","",["black_right_pointing_double_triangle_with_vertical_bar"],0,22,31,0],"23ee":[["⏮"],"","",["black_left_pointing_double_triangle_with_vertical_bar"],0,23,31,0],"23ef":[["⏯"],"","",["black_right_pointing_triangle_with_double_vertical_bar"],0,24,31,0],"23f0":[["⏰"],"","󾀪",["alarm_clock"],0,25,63,0],"23f1":[["⏱"],"","",["stopwatch"],0,26,31,0],"23f2":[["⏲"],"","",["timer_clock"],0,27,31,0],"23f3":[["⏳"],"","󾀛",["hourglass_flowing_sand"],0,28,63,0],"23f8":[["⏸"],"","",["double_vertical_bar"],0,29,31,0],"23f9":[["⏹"],"","",["black_square_for_stop"],0,30,31,0],"23fa":[["⏺"],"","",["black_circle_for_record"],0,31,31,0],"24c2":[["Ⓜ️","Ⓜ"],"","󾟡",["m"],0,32,63,0],"25aa":[["▪️","▪"],"","󾭮",["black_small_square"],0,33,63,0],"25ab":[["▫️","▫"],"","󾭭",["white_small_square"],0,34,63,0],"25b6":[["▶️","▶"],"","󾫼",["arrow_forward"],0,35,63,0],"25c0":[["◀️","◀"],"","󾫽",["arrow_backward"],0,36,63,0],"25fb":[["◻️","◻"],"","󾭱",["white_medium_square"],0,37,63,0],"25fc":[["◼️","◼"],"","󾭲",["black_medium_square"],0,38,63,0],"25fd":[["◽️","◽"],"","󾭯",["white_medium_small_square"],0,39,63,0],"25fe":[["◾️","◾"],"","󾭰",["black_medium_small_square"],0,40,63,0],2600:[["☀️","☀"],"","󾀀",["sunny"],0,41,63,0],2601:[["☁️","☁"],"","󾀁",["cloud"],0,42,63,0],2602:[["☂️","☂"],"","",["umbrella"],0,43,31,0],2603:[["☃️","☃"],"","",["snowman"],0,44,31,0],2604:[["☄️","☄"],"","",["comet"],0,45,31,0],"260e":[["☎️","☎"],"","󾔣",["phone","telephone"],0,46,63,0],2611:[["☑️","☑"],"","󾮋",["ballot_box_with_check"],0,47,63,0],2614:[["☔️","☔"],"","󾀂",["umbrella_with_rain_drops"],0,48,63,0],2615:[["☕️","☕"],"","󾦁",["coffee"],1,0,63,0],2618:[["☘️","☘"],"","",["shamrock"],1,1,31,0],"261d":[["☝️","☝"],"","󾮘",["point_up"],1,2,63,0],2620:[["☠️","☠"],"","",["skull_and_crossbones"],1,8,31,0],2622:[["☢️","☢"],"","",["radioactive_sign"],1,9,31,0],2623:[["☣️","☣"],"","",["biohazard_sign"],1,10,31,0],2626:[["☦️","☦"],"","",["orthodox_cross"],1,11,31,0],"262a":[["☪️","☪"],"","",["star_and_crescent"],1,12,31,0],"262e":[["☮️","☮"],"","",["peace_symbol"],1,13,31,0],"262f":[["☯️","☯"],"","",["yin_yang"],1,14,31,0],2638:[["☸️","☸"],"","",["wheel_of_dharma"],1,15,31,0],2639:[["☹️","☹"],"","",["white_frowning_face"],1,16,31,0],"263a":[["☺️","☺"],"","󾌶",["relaxed"],1,17,63,0],2640:[["♀"],"","",["female_sign"],1,18,22,0],2642:[["♂"],"","",["male_sign"],1,19,22,0],2648:[["♈️","♈"],"","󾀫",["aries"],1,20,63,0],2649:[["♉️","♉"],"","󾀬",["taurus"],1,21,63,0],"264a":[["♊️","♊"],"","󾀭",["gemini"],1,22,63,0],"264b":[["♋️","♋"],"","󾀮",["cancer"],1,23,63,0],"264c":[["♌️","♌"],"","󾀯",["leo"],1,24,63,0],"264d":[["♍️","♍"],"","󾀰",["virgo"],1,25,63,0],"264e":[["♎️","♎"],"","󾀱",["libra"],1,26,63,0],"264f":[["♏️","♏"],"","󾀲",["scorpius"],1,27,63,0],2650:[["♐️","♐"],"","󾀳",["sagittarius"],1,28,63,0],2651:[["♑️","♑"],"","󾀴",["capricorn"],1,29,63,0],2652:[["♒️","♒"],"","󾀵",["aquarius"],1,30,63,0],2653:[["♓️","♓"],"","󾀶",["pisces"],1,31,63,0],2660:[["♠️","♠"],"","󾬛",["spades"],1,32,63,0],2663:[["♣️","♣"],"","󾬝",["clubs"],1,33,63,0],2665:[["♥️","♥"],"","󾬚",["hearts"],1,34,63,0],2666:[["♦️","♦"],"","󾬜",["diamonds"],1,35,63,0],2668:[["♨️","♨"],"","󾟺",["hotsprings"],1,36,63,0],"267b":[["♻️","♻"],"","󾬬",["recycle"],1,37,63,0],"267f":[["♿️","♿"],"","󾬠",["wheelchair"],1,38,63,0],2692:[["⚒"],"","",["hammer_and_pick"],1,39,31,0],2693:[["⚓️","⚓"],"","󾓁",["anchor"],1,40,63,0],2694:[["⚔️","⚔"],"","",["crossed_swords"],1,41,31,0],2695:[["⚕"],"","",["staff_of_aesculapius"],1,42,7,0],2696:[["⚖️","⚖"],"","",["scales"],1,43,31,0],2697:[["⚗️","⚗"],"","",["alembic"],1,44,31,0],2699:[["⚙️","⚙"],"","",["gear"],1,45,31,0],"269b":[["⚛️","⚛"],"","",["atom_symbol"],1,46,31,0],"269c":[["⚜️","⚜"],"","",["fleur_de_lis"],1,47,31,0],"26a0":[["⚠️","⚠"],"","󾬣",["warning"],1,48,63,0],"26a1":[["⚡️","⚡"],"","󾀄",["zap"],2,0,63,0],"26aa":[["⚪️","⚪"],"","󾭥",["white_circle"],2,1,63,0],"26ab":[["⚫️","⚫"],"","󾭦",["black_circle"],2,2,63,0],"26b0":[["⚰️","⚰"],"","",["coffin"],2,3,31,0],"26b1":[["⚱️","⚱"],"","",["funeral_urn"],2,4,31,0],"26bd":[["⚽️","⚽"],"","󾟔",["soccer"],2,5,63,0],"26be":[["⚾️","⚾"],"","󾟑",["baseball"],2,6,63,0],"26c4":[["⛄️","⛄"],"","󾀃",["snowman_without_snow"],2,7,63,0],"26c5":[["⛅️","⛅"],"","󾀏",["partly_sunny"],2,8,63,0],"26c8":[["⛈"],"","",["thunder_cloud_and_rain"],2,9,31,0],
 "26ce":[["⛎"],"","󾀷",["ophiuchus"],2,10,63,0],"26cf":[["⛏"],"","",["pick"],2,11,31,0],"26d1":[["⛑"],"","",["helmet_with_white_cross"],2,12,31,0],"26d3":[["⛓"],"","",["chains"],2,13,31,0],"26d4":[["⛔️","⛔"],"","󾬦",["no_entry"],2,14,63,0],"26e9":[["⛩"],"","",["shinto_shrine"],2,15,31,0],"26ea":[["⛪️","⛪"],"","󾒻",["church"],2,16,63,0],"26f0":[["⛰"],"","",["mountain"],2,17,31,0],"26f1":[["⛱"],"","",["umbrella_on_ground"],2,18,31,0],"26f2":[["⛲️","⛲"],"","󾒼",["fountain"],2,19,63,0],"26f3":[["⛳️","⛳"],"","󾟒",["golf"],2,20,63,0],"26f4":[["⛴"],"","",["ferry"],2,21,31,0],"26f5":[["⛵️","⛵"],"","󾟪",["boat","sailboat"],2,22,63,0],"26f7":[["⛷"],"","",["skier"],2,23,31,0],"26f8":[["⛸"],"","",["ice_skate"],2,24,31,0],"26fa":[["⛺️","⛺"],"","󾟻",["tent"],2,31,63,0],"26fd":[["⛽️","⛽"],"","󾟵",["fuelpump"],2,32,63,0],2702:[["✂️","✂"],"","󾔾",["scissors"],2,33,63,0],2705:[["✅"],"","󾭊",["white_check_mark"],2,34,63,0],2708:[["✈️","✈"],"","󾟩",["airplane"],2,35,63,0],2709:[["✉️","✉"],"","󾔩",["email","envelope"],2,36,63,0],"270a":[["✊"],"","󾮓",["fist"],2,37,63,0],"270b":[["✋"],"","󾮕",["hand","raised_hand"],2,43,63,0],"270c":[["✌️","✌"],"","󾮔",["v"],3,0,63,0],"270d":[["✍️","✍"],"","",["writing_hand"],3,6,31,0],"270f":[["✏️","✏"],"","󾔹",["pencil2"],3,12,63,0],2712:[["✒️","✒"],"","󾔶",["black_nib"],3,13,63,0],2714:[["✔️","✔"],"","󾭉",["heavy_check_mark"],3,14,63,0],2716:[["✖️","✖"],"","󾭓",["heavy_multiplication_x"],3,15,63,0],"271d":[["✝️","✝"],"","",["latin_cross"],3,16,31,0],2721:[["✡️","✡"],"","",["star_of_david"],3,17,31,0],2728:[["✨"],"","󾭠",["sparkles"],3,18,63,0],2733:[["✳️","✳"],"","󾭢",["eight_spoked_asterisk"],3,19,63,0],2734:[["✴️","✴"],"","󾭡",["eight_pointed_black_star"],3,20,63,0],2744:[["❄️","❄"],"","󾀎",["snowflake"],3,21,63,0],2747:[["❇️","❇"],"","󾭷",["sparkle"],3,22,63,0],"274c":[["❌"],"","󾭅",["x"],3,23,63,0],"274e":[["❎"],"","󾭆",["negative_squared_cross_mark"],3,24,63,0],2753:[["❓"],"","󾬉",["question"],3,25,63,0],2754:[["❔"],"","󾬊",["grey_question"],3,26,63,0],2755:[["❕"],"","󾬋",["grey_exclamation"],3,27,63,0],2757:[["❗️","❗"],"","󾬄",["exclamation","heavy_exclamation_mark"],3,28,63,0],2763:[["❣️","❣"],"","",["heavy_heart_exclamation_mark_ornament"],3,29,31,0],2764:[["❤️","❤"],"","󾬌",["heart"],3,30,63,0,"<3"],2795:[["➕"],"","󾭑",["heavy_plus_sign"],3,31,63,0],2796:[["➖"],"","󾭒",["heavy_minus_sign"],3,32,63,0],2797:[["➗"],"","󾭔",["heavy_division_sign"],3,33,63,0],"27a1":[["➡️","➡"],"","󾫺",["arrow_right"],3,34,63,0],"27b0":[["➰"],"","󾬈",["curly_loop"],3,35,63,0],"27bf":[["➿"],"","󾠫",["loop"],3,36,63,0],2934:[["⤴️","⤴"],"","󾫴",["arrow_heading_up"],3,37,63,0],2935:[["⤵️","⤵"],"","󾫵",["arrow_heading_down"],3,38,63,0],"2b05":[["⬅️","⬅"],"","󾫻",["arrow_left"],3,39,63,0],"2b06":[["⬆️","⬆"],"","󾫸",["arrow_up"],3,40,63,0],"2b07":[["⬇️","⬇"],"","󾫹",["arrow_down"],3,41,63,0],"2b1b":[["⬛️","⬛"],"","󾭬",["black_large_square"],3,42,63,0],"2b1c":[["⬜️","⬜"],"","󾭫",["white_large_square"],3,43,63,0],"2b50":[["⭐️","⭐"],"","󾭨",["star"],3,44,63,0],"2b55":[["⭕️","⭕"],"","󾭄",["o"],3,45,63,0],3030:[["〰️","〰"],"","󾬇",["wavy_dash"],3,46,63,0],"303d":[["〽️","〽"],"","󾠛",["part_alternation_mark"],3,47,63,0],3297:[["㊗️","㊗"],"","󾭃",["congratulations"],3,48,63,0],3299:[["㊙️","㊙"],"","󾬫",["secret"],4,0,63,0],"1f004":[["🀄️","🀄"],"","󾠋",["mahjong"],4,1,63,0],"1f0cf":[["🃏"],"","󾠒",["black_joker"],4,2,63,0],"1f170":[["🅰️","🅰"],"","󾔋",["a"],4,3,63,0],"1f171":[["🅱️","🅱"],"","󾔌",["b"],4,4,63,0],"1f17e":[["🅾️","🅾"],"","󾔎",["o2"],4,5,63,0],"1f17f":[["🅿️","🅿"],"","󾟶",["parking"],4,6,63,0],"1f18e":[["🆎"],"","󾔍",["ab"],4,7,63,0],"1f191":[["🆑"],"","󾮄",["cl"],4,8,63,0],"1f192":[["🆒"],"","󾬸",["cool"],4,9,63,0],"1f193":[["🆓"],"","󾬡",["free"],4,10,63,0],"1f194":[["🆔"],"","󾮁",["id"],4,11,63,0],"1f195":[["🆕"],"","󾬶",["new"],4,12,63,0],"1f196":[["🆖"],"","󾬨",["ng"],4,13,63,0],"1f197":[["🆗"],"","󾬧",["ok"],4,14,63,0],"1f198":[["🆘"],"","󾭏",["sos"],4,15,63,0],"1f199":[["🆙"],"","󾬷",["up"],4,16,63,0],"1f19a":[["🆚"],"","󾬲",["vs"],4,17,63,0],"1f201":[["🈁"],"","󾬤",["koko"],4,18,63,0],"1f202":[["🈂️","🈂"],"","󾬿",["sa"],4,19,63,0],"1f21a":[["🈚️","🈚"],"","󾬺",["u7121"],4,20,63,0],"1f22f":[["🈯️","🈯"],"","󾭀",["u6307"],4,21,63,0],"1f232":[["🈲"],"","󾬮",["u7981"],4,22,63,0],"1f233":[["🈳"],"","󾬯",["u7a7a"],4,23,63,0],"1f234":[["🈴"],"","󾬰",["u5408"],4,24,63,0],"1f235":[["🈵"],"","󾬱",["u6e80"],4,25,63,0],"1f236":[["🈶"],"","󾬹",["u6709"],4,26,63,0],"1f237":[["🈷️","🈷"],"","󾬻",["u6708"],4,27,63,0],"1f238":[["🈸"],"","󾬼",["u7533"],4,28,63,0],"1f239":[["🈹"],"","󾬾",["u5272"],4,29,63,0],"1f23a":[["🈺"],"","󾭁",["u55b6"],4,30,63,0],"1f250":[["🉐"],"","󾬽",["ideograph_advantage"],4,31,63,0],"1f251":[["🉑"],"","󾭐",["accept"],4,32,63,0],"1f300":[["🌀"],"","󾀅",["cyclone"],4,33,63,0],"1f301":[["🌁"],"","󾀆",["foggy"],4,34,63,0],"1f302":[["🌂"],"","󾀇",["closed_umbrella"],4,35,63,0],"1f303":[["🌃"],"","󾀈",["night_with_stars"],4,36,63,0],"1f304":[["🌄"],"","󾀉",["sunrise_over_mountains"],4,37,63,0],"1f305":[["🌅"],"","󾀊",["sunrise"],4,38,63,0],"1f306":[["🌆"],"","󾀋",["city_sunset"],4,39,63,0],"1f307":[["🌇"],"","󾀌",["city_sunrise"],4,40,63,0],"1f308":[["🌈"],"","󾀍",["rainbow"],4,41,63,0],"1f309":[["🌉"],"","󾀐",["bridge_at_night"],4,42,63,0],"1f30a":[["🌊"],"","󾀸",["ocean"],4,43,63,0],"1f30b":[["🌋"],"","󾀺",["volcano"],4,44,63,0],"1f30c":[["🌌"],"","󾀻",["milky_way"],4,45,63,0],"1f30d":[["🌍"],"","",["earth_africa"],4,46,63,0],"1f30e":[["🌎"],"","",["earth_americas"],4,47,63,0],"1f30f":[["🌏"],"","󾀹",["earth_asia"],4,48,63,0],"1f310":[["🌐"],"","",["globe_with_meridians"],5,0,63,0],"1f311":[["🌑"],"","󾀑",["new_moon"],5,1,63,0],"1f312":[["🌒"],"","",["waxing_crescent_moon"],5,2,63,0],"1f313":[["🌓"],"","󾀓",["first_quarter_moon"],5,3,63,0],"1f314":[["🌔"],"","󾀒",["moon","waxing_gibbous_moon"],5,4,63,0],"1f315":[["🌕"],"","󾀕",["full_moon"],5,5,63,0],"1f316":[["🌖"],"","",["waning_gibbous_moon"],5,6,63,0],"1f317":[["🌗"],"","",["last_quarter_moon"],5,7,63,0],"1f318":[["🌘"],"","",["waning_crescent_moon"],5,8,63,0],"1f319":[["🌙"],"","󾀔",["crescent_moon"],5,9,63,0],"1f31a":[["🌚"],"","",["new_moon_with_face"],5,10,63,0],"1f31b":[["🌛"],"","󾀖",["first_quarter_moon_with_face"],5,11,63,0],"1f31c":[["🌜"],"","",["last_quarter_moon_with_face"],5,12,63,0],"1f31d":[["🌝"],"","",["full_moon_with_face"],5,13,63,0],"1f31e":[["🌞"],"","",["sun_with_face"],5,14,63,0],"1f31f":[["🌟"],"","󾭩",["star2"],5,15,63,0],"1f320":[["🌠"],"","󾭪",["stars"],5,16,63,0],"1f321":[["🌡"],"","",["thermometer"],5,17,31,0],"1f324":[["🌤"],"","",["mostly_sunny","sun_small_cloud"],5,18,31,0],"1f325":[["🌥"],"","",["barely_sunny","sun_behind_cloud"],5,19,31,0],"1f326":[["🌦"],"","",["partly_sunny_rain","sun_behind_rain_cloud"],5,20,31,0],"1f327":[["🌧"],"","",["rain_cloud"],5,21,31,0],"1f328":[["🌨"],"","",["snow_cloud"],5,22,31,0],"1f329":[["🌩"],"","",["lightning","lightning_cloud"],5,23,31,0],"1f32a":[["🌪"],"","",["tornado","tornado_cloud"],5,24,31,0],"1f32b":[["🌫"],"","",["fog"],5,25,31,0],"1f32c":[["🌬"],"","",["wind_blowing_face"],5,26,31,0],"1f32d":[["🌭"],"","",["hotdog"],5,27,31,0],"1f32e":[["🌮"],"","",["taco"],5,28,31,0],"1f32f":[["🌯"],"","",["burrito"],5,29,31,0],"1f330":[["🌰"],"","󾁌",["chestnut"],5,30,63,0],"1f331":[["🌱"],"","󾀾",["seedling"],5,31,63,0],"1f332":[["🌲"],"","",["evergreen_tree"],5,32,63,0],"1f333":[["🌳"],"","",["deciduous_tree"],5,33,63,0],"1f334":[["🌴"],"","󾁇",["palm_tree"],5,34,63,0],"1f335":[["🌵"],"","󾁈",["cactus"],5,35,63,0],"1f336":[["🌶"],"","",["hot_pepper"],5,36,31,0],"1f337":[["🌷"],"","󾀽",["tulip"],5,37,63,0],"1f338":[["🌸"],"","󾁀",["cherry_blossom"],5,38,63,0],"1f339":[["🌹"],"","󾁁",["rose"],5,39,63,0],"1f33a":[["🌺"],"","󾁅",["hibiscus"],5,40,63,0],"1f33b":[["🌻"],"","󾁆",["sunflower"],5,41,63,0],"1f33c":[["🌼"],"","󾁍",["blossom"],5,42,63,0],"1f33d":[["🌽"],"","󾁊",["corn"],5,43,63,0],"1f33e":[["🌾"],"","󾁉",["ear_of_rice"],5,44,63,0],"1f33f":[["🌿"],"","󾁎",["herb"],5,45,63,0],"1f340":[["🍀"],"","󾀼",["four_leaf_clover"],5,46,63,0],"1f341":[["🍁"],"","󾀿",["maple_leaf"],5,47,63,0],"1f342":[["🍂"],"","󾁂",["fallen_leaf"],5,48,63,0],"1f343":[["🍃"],"","󾁃",["leaves"],6,0,63,0],"1f344":[["🍄"],"","󾁋",["mushroom"],6,1,63,0],"1f345":[["🍅"],"","󾁕",["tomato"],6,2,63,0],"1f346":[["🍆"],"","󾁖",["eggplant"],6,3,63,0],"1f347":[["🍇"],"","󾁙",["grapes"],6,4,63,0],"1f348":[["🍈"],"","󾁗",["melon"],6,5,63,0],"1f349":[["🍉"],"","󾁔",["watermelon"],6,6,63,0],"1f34a":[["🍊"],"","󾁒",["tangerine"],6,7,63,0],"1f34b":[["🍋"],"","",["lemon"],6,8,63,0],"1f34c":[["🍌"],"","󾁐",["banana"],6,9,63,0],"1f34d":[["🍍"],"","󾁘",["pineapple"],6,10,63,0],"1f34e":[["🍎"],"","󾁑",["apple"],6,11,63,0],"1f34f":[["🍏"],"","󾁛",["green_apple"],6,12,63,0],"1f350":[["🍐"],"","",["pear"],6,13,63,0],"1f351":[["🍑"],"","󾁚",["peach"],6,14,63,0],"1f352":[["🍒"],"","󾁏",["cherries"],6,15,63,0],"1f353":[["🍓"],"","󾁓",["strawberry"],6,16,63,0],"1f354":[["🍔"],"","󾥠",["hamburger"],6,17,63,0],"1f355":[["🍕"],"","󾥵",["pizza"],6,18,63,0],"1f356":[["🍖"],"","󾥲",["meat_on_bone"],6,19,63,0],"1f357":[["🍗"],"","󾥶",["poultry_leg"],6,20,63,0],"1f358":[["🍘"],"","󾥩",["rice_cracker"],6,21,63,0],"1f359":[["🍙"],"","󾥡",["rice_ball"],6,22,63,0],"1f35a":[["🍚"],"","󾥪",["rice"],6,23,63,0],"1f35b":[["🍛"],"","󾥬",["curry"],6,24,63,0],"1f35c":[["🍜"],"","󾥣",["ramen"],6,25,63,0],"1f35d":[["🍝"],"","󾥫",["spaghetti"],6,26,63,0],"1f35e":[["🍞"],"","󾥤",["bread"],6,27,63,0],"1f35f":[["🍟"],"","󾥧",["fries"],6,28,63,0],"1f360":[["🍠"],"","󾥴",["sweet_potato"],6,29,63,0],"1f361":[["🍡"],"","󾥨",["dango"],6,30,63,0],"1f362":[["🍢"],"","󾥭",["oden"],6,31,63,0],"1f363":[["🍣"],"","󾥮",["sushi"],6,32,63,0],"1f364":[["🍤"],"","󾥿",["fried_shrimp"],6,33,63,0],"1f365":[["🍥"],"","󾥳",["fish_cake"],6,34,63,0],"1f366":[["🍦"],"","󾥦",["icecream"],6,35,63,0],"1f367":[["🍧"],"","󾥱",["shaved_ice"],6,36,63,0],"1f368":[["🍨"],"","󾥷",["ice_cream"],6,37,63,0],"1f369":[["🍩"],"","󾥸",["doughnut"],6,38,63,0],"1f36a":[["🍪"],"","󾥹",["cookie"],6,39,63,0],"1f36b":[["🍫"],"","󾥺",["chocolate_bar"],6,40,63,0],"1f36c":[["🍬"],"","󾥻",["candy"],6,41,63,0],"1f36d":[["🍭"],"","󾥼",["lollipop"],6,42,63,0],"1f36e":[["🍮"],"","󾥽",["custard"],6,43,63,0],"1f36f":[["🍯"],"","󾥾",["honey_pot"],6,44,63,0],"1f370":[["🍰"],"","󾥢",["cake"],6,45,63,0],"1f371":[["🍱"],"","󾥯",["bento"],6,46,63,0],"1f372":[["🍲"],"","󾥰",["stew"],6,47,63,0],"1f373":[["🍳"],"","󾥥",["fried_egg","cooking"],6,48,63,0],"1f374":[["🍴"],"","󾦀",["fork_and_knife"],7,0,63,0],"1f375":[["🍵"],"","󾦄",["tea"],7,1,63,0],"1f376":[["🍶"],"","󾦅",["sake"],7,2,63,0],"1f377":[["🍷"],"","󾦆",["wine_glass"],7,3,63,0],"1f378":[["🍸"],"","󾦂",["cocktail"],7,4,63,0],"1f379":[["🍹"],"","󾦈",["tropical_drink"],7,5,63,0],"1f37a":[["🍺"],"","󾦃",["beer"],7,6,63,0],"1f37b":[["🍻"],"","󾦇",["beers"],7,7,63,0],"1f37c":[["🍼"],"","",["baby_bottle"],7,8,63,0],"1f37d":[["🍽"],"","",["knife_fork_plate"],7,9,31,0],"1f37e":[["🍾"],"","",["champagne"],7,10,31,0],"1f37f":[["🍿"],"","",["popcorn"],7,11,31,0],"1f380":[["🎀"],"","󾔏",["ribbon"],7,12,63,0],"1f381":[["🎁"],"","󾔐",["gift"],7,13,63,0],"1f382":[["🎂"],"","󾔑",["birthday"],7,14,63,0],"1f383":[["🎃"],"","󾔟",["jack_o_lantern"],7,15,63,0],"1f384":[["🎄"],"","󾔒",["christmas_tree"],7,16,63,0],"1f385":[["🎅"],"","󾔓",["santa"],7,17,63,0],"1f386":[["🎆"],"","󾔕",["fireworks"],7,23,63,0],"1f387":[["🎇"],"","󾔝",["sparkler"],7,24,63,0],"1f388":[["🎈"],"","󾔖",["balloon"],7,25,63,0],"1f389":[["🎉"],"","󾔗",["tada"],7,26,63,0],"1f38a":[["🎊"],"","󾔠",["confetti_ball"],7,27,63,0],"1f38b":[["🎋"],"","󾔡",["tanabata_tree"],7,28,63,0],"1f38c":[["🎌"],"","󾔔",["crossed_flags"],7,29,63,0],"1f38d":[["🎍"],"","󾔘",["bamboo"],7,30,63,0],"1f38e":[["🎎"],"","󾔙",["dolls"],7,31,63,0],"1f38f":[["🎏"],"","󾔜",["flags"],7,32,63,0],"1f390":[["🎐"],"","󾔞",["wind_chime"],7,33,63,0],"1f391":[["🎑"],"","󾀗",["rice_scene"],7,34,63,0],"1f392":[["🎒"],"","󾔛",["school_satchel"],7,35,63,0],"1f393":[["🎓"],"","󾔚",["mortar_board"],7,36,63,0],"1f396":[["🎖"],"","",["medal"],7,37,31,0],"1f397":[["🎗"],"","",["reminder_ribbon"],7,38,31,0],"1f399":[["🎙"],"","",["studio_microphone"],7,39,31,0],"1f39a":[["🎚"],"","",["level_slider"],7,40,31,0],"1f39b":[["🎛"],"","",["control_knobs"],7,41,31,0],"1f39e":[["🎞"],"","",["film_frames"],7,42,31,0],"1f39f":[["🎟"],"","",["admission_tickets"],7,43,31,0],"1f3a0":[["🎠"],"","󾟼",["carousel_horse"],7,44,63,0],"1f3a1":[["🎡"],"","󾟽",["ferris_wheel"],7,45,63,0],"1f3a2":[["🎢"],"","󾟾",["roller_coaster"],7,46,63,0],"1f3a3":[["🎣"],"","󾟿",["fishing_pole_and_fish"],7,47,63,0],"1f3a4":[["🎤"],"","󾠀",["microphone"],7,48,63,0],"1f3a5":[["🎥"],"","󾠁",["movie_camera"],8,0,63,0],"1f3a6":[["🎦"],"","󾠂",["cinema"],8,1,63,0],"1f3a7":[["🎧"],"","󾠃",["headphones"],8,2,63,0],"1f3a8":[["🎨"],"","󾠄",["art"],8,3,63,0],"1f3a9":[["🎩"],"","󾠅",["tophat"],8,4,63,0],"1f3aa":[["🎪"],"","󾠆",["circus_tent"],8,5,63,0],"1f3ab":[["🎫"],"","󾠇",["ticket"],8,6,63,0],"1f3ac":[["🎬"],"","󾠈",["clapper"],8,7,63,0],"1f3ad":[["🎭"],"","󾠉",["performing_arts"],8,8,63,0],"1f3ae":[["🎮"],"","󾠊",["video_game"],8,9,63,0],"1f3af":[["🎯"],"","󾠌",["dart"],8,10,63,0],"1f3b0":[["🎰"],"","󾠍",["slot_machine"],8,11,63,0],"1f3b1":[["🎱"],"","󾠎",["8ball"],8,12,63,0],"1f3b2":[["🎲"],"","󾠏",["game_die"],8,13,63,0],"1f3b3":[["🎳"],"","󾠐",["bowling"],8,14,63,0],"1f3b4":[["🎴"],"","󾠑",["flower_playing_cards"],8,15,63,0],"1f3b5":[["🎵"],"","󾠓",["musical_note"],8,16,63,0],"1f3b6":[["🎶"],"","󾠔",["notes"],8,17,63,0],"1f3b7":[["🎷"],"","󾠕",["saxophone"],8,18,63,0],"1f3b8":[["🎸"],"","󾠖",["guitar"],8,19,63,0],"1f3b9":[["🎹"],"","󾠗",["musical_keyboard"],8,20,63,0],"1f3ba":[["🎺"],"","󾠘",["trumpet"],8,21,63,0],"1f3bb":[["🎻"],"","󾠙",["violin"],8,22,63,0],"1f3bc":[["🎼"],"","󾠚",["musical_score"],8,23,63,0],"1f3bd":[["🎽"],"","󾟐",["running_shirt_with_sash"],8,24,63,0],"1f3be":[["🎾"],"","󾟓",["tennis"],8,25,63,0],"1f3bf":[["🎿"],"","󾟕",["ski"],8,26,63,0],"1f3c0":[["🏀"],"","󾟖",["basketball"],8,27,63,0],"1f3c1":[["🏁"],"","󾟗",["checkered_flag"],8,28,63,0],"1f3c2":[["🏂"],"","󾟘",["snowboarder"],8,29,63,0],"1f3c5":[["🏅"],"","",["sports_medal"],8,47,31,0],"1f3c6":[["🏆"],"","󾟛",["trophy"],8,48,63,0],"1f3c7":[["🏇"],"","",["horse_racing"],9,0,63,0],"1f3c8":[["🏈"],"","󾟝",["football"],9,6,63,0],"1f3c9":[["🏉"],"","",["rugby_football"],9,7,63,0],"1f3cd":[["🏍"],"","",["racing_motorcycle"],9,26,31,0],"1f3ce":[["🏎"],"","",["racing_car"],9,27,31,0],"1f3cf":[["🏏"],"","",["cricket_bat_and_ball"],9,28,31,0],"1f3d0":[["🏐"],"","",["volleyball"],9,29,31,0],"1f3d1":[["🏑"],"","",["field_hockey_stick_and_ball"],9,30,31,0],"1f3d2":[["🏒"],"","",["ice_hockey_stick_and_puck"],9,31,31,0],"1f3d3":[["🏓"],"","",["table_tennis_paddle_and_ball"],9,32,31,0],"1f3d4":[["🏔"],"","",["snow_capped_mountain"],9,33,31,0],"1f3d5":[["🏕"],"","",["camping"],9,34,31,0],"1f3d6":[["🏖"],"","",["beach_with_umbrella"],9,35,31,0],"1f3d7":[["🏗"],"","",["building_construction"],9,36,31,0],"1f3d8":[["🏘"],"","",["house_buildings"],9,37,31,0],"1f3d9":[["🏙"],"","",["cityscape"],9,38,31,0],"1f3da":[["🏚"],"","",["derelict_house_building"],9,39,31,0],"1f3db":[["🏛"],"","",["classical_building"],9,40,31,0],"1f3dc":[["🏜"],"","",["desert"],9,41,31,0],"1f3dd":[["🏝"],"","",["desert_island"],9,42,31,0],"1f3de":[["🏞"],"","",["national_park"],9,43,31,0],"1f3df":[["🏟"],"","",["stadium"],9,44,31,0],"1f3e0":[["🏠"],"","󾒰",["house"],9,45,63,0],"1f3e1":[["🏡"],"","󾒱",["house_with_garden"],9,46,63,0],"1f3e2":[["🏢"],"","󾒲",["office"],9,47,63,0],"1f3e3":[["🏣"],"","󾒳",["post_office"],9,48,63,0],"1f3e4":[["🏤"],"","",["european_post_office"],10,0,63,0],"1f3e5":[["🏥"],"","󾒴",["hospital"],10,1,63,0],"1f3e6":[["🏦"],"","󾒵",["bank"],10,2,63,0],"1f3e7":[["🏧"],"","󾒶",["atm"],10,3,63,0],"1f3e8":[["🏨"],"","󾒷",["hotel"],10,4,63,0],"1f3e9":[["🏩"],"","󾒸",["love_hotel"],10,5,63,0],"1f3ea":[["🏪"],"","󾒹",["convenience_store"],10,6,63,0],"1f3eb":[["🏫"],"","󾒺",["school"],10,7,63,0],"1f3ec":[["🏬"],"","󾒽",["department_store"],10,8,63,0],"1f3ed":[["🏭"],"","󾓀",["factory"],10,9,63,0],"1f3ee":[["🏮"],"","󾓂",["izakaya_lantern","lantern"],10,10,63,0],"1f3ef":[["🏯"],"","󾒾",["japanese_castle"],10,11,63,0],"1f3f0":[["🏰"],"","󾒿",["european_castle"],10,12,63,0],"1f3f3":[["🏳️","🏳"],"","",["waving_white_flag"],10,13,31,0],"1f3f4":[["🏴"],"","",["waving_black_flag"],10,14,31,0],"1f3f5":[["🏵"],"","",["rosette"],10,15,31,0],"1f3f7":[["🏷"],"","",["label"],10,16,31,0],"1f3f8":[["🏸"],"","",["badminton_racquet_and_shuttlecock"],10,17,31,0],"1f3f9":[["🏹"],"","",["bow_and_arrow"],10,18,31,0],"1f3fa":[["🏺"],"","",["amphora"],10,19,31,0],"1f3fb":[["🏻"],"","",["skin-tone-2"],10,20,31,0],"1f3fc":[["🏼"],"","",["skin-tone-3"],10,21,31,0],"1f3fd":[["🏽"],"","",["skin-tone-4"],10,22,31,0],"1f3fe":[["🏾"],"","",["skin-tone-5"],10,23,31,0],"1f3ff":[["🏿"],"","",["skin-tone-6"],10,24,31,0],"1f400":[["🐀"],"","",["rat"],10,25,63,0],"1f401":[["🐁"],"","",["mouse2"],10,26,63,0],"1f402":[["🐂"],"","",["ox"],10,27,63,0],"1f403":[["🐃"],"","",["water_buffalo"],10,28,63,0],"1f404":[["🐄"],"","",["cow2"],10,29,63,0],"1f405":[["🐅"],"","",["tiger2"],10,30,63,0],"1f406":[["🐆"],"","",["leopard"],10,31,63,0],"1f407":[["🐇"],"","",["rabbit2"],10,32,63,0],"1f408":[["🐈"],"","",["cat2"],10,33,63,0],"1f409":[["🐉"],"","",["dragon"],10,34,63,0],"1f40a":[["🐊"],"","",["crocodile"],10,35,63,0],"1f40b":[["🐋"],"","",["whale2"],10,36,63,0],"1f40c":[["🐌"],"","󾆹",["snail"],10,37,63,0],"1f40d":[["🐍"],"","󾇓",["snake"],10,38,63,0],"1f40e":[["🐎"],"","󾟜",["racehorse"],10,39,63,0],"1f40f":[["🐏"],"","",["ram"],10,40,63,0],"1f410":[["🐐"],"","",["goat"],10,41,63,0],"1f411":[["🐑"],"","󾇏",["sheep"],10,42,63,0],"1f412":[["🐒"],"","󾇎",["monkey"],10,43,63,0],"1f413":[["🐓"],"","",["rooster"],10,44,63,0],"1f414":[["🐔"],"","󾇔",["chicken"],10,45,63,0],"1f415":[["🐕"],"","",["dog2"],10,46,63,0],"1f416":[["🐖"],"","",["pig2"],10,47,63,0],"1f417":[["🐗"],"","󾇕",["boar"],10,48,63,0],"1f418":[["🐘"],"","󾇌",["elephant"],11,0,63,0],"1f419":[["🐙"],"","󾇅",["octopus"],11,1,63,0],"1f41a":[["🐚"],"","󾇆",["shell"],11,2,63,0],"1f41b":[["🐛"],"","󾇋",["bug"],11,3,63,0],"1f41c":[["🐜"],"","󾇚",["ant"],11,4,63,0],"1f41d":[["🐝"],"","󾇡",["bee","honeybee"],11,5,63,0],"1f41e":[["🐞"],"","󾇢",["beetle"],11,6,63,0],"1f41f":[["🐟"],"","󾆽",["fish"],11,7,63,0],"1f420":[["🐠"],"","󾇉",["tropical_fish"],11,8,63,0],"1f421":[["🐡"],"","󾇙",["blowfish"],11,9,63,0],"1f422":[["🐢"],"","󾇜",["turtle"],11,10,63,0],"1f423":[["🐣"],"","󾇝",["hatching_chick"],11,11,63,0],"1f424":[["🐤"],"","󾆺",["baby_chick"],11,12,63,0],"1f425":[["🐥"],"","󾆻",["hatched_chick"],11,13,63,0],"1f426":[["🐦"],"","󾇈",["bird"],11,14,63,0],"1f427":[["🐧"],"","󾆼",["penguin"],11,15,63,0],"1f428":[["🐨"],"","󾇍",["koala"],11,16,63,0],"1f429":[["🐩"],"","󾇘",["poodle"],11,17,63,0],"1f42a":[["🐪"],"","",["dromedary_camel"],11,18,63,0],"1f42b":[["🐫"],"","󾇖",["camel"],11,19,63,0],"1f42c":[["🐬"],"","󾇇",["dolphin","flipper"],11,20,63,0],"1f42d":[["🐭"],"","󾇂",["mouse"],11,21,63,0],"1f42e":[["🐮"],"","󾇑",["cow"],11,22,63,0],"1f42f":[["🐯"],"","󾇀",["tiger"],11,23,63,0],"1f430":[["🐰"],"","󾇒",["rabbit"],11,24,63,0],"1f431":[["🐱"],"","󾆸",["cat"],11,25,63,0],"1f432":[["🐲"],"","󾇞",["dragon_face"],11,26,63,0],"1f433":[["🐳"],"","󾇃",["whale"],11,27,63,0],"1f434":[["🐴"],"","󾆾",["horse"],11,28,63,0],"1f435":[["🐵"],"","󾇄",["monkey_face"],11,29,63,0],"1f436":[["🐶"],"","󾆷",["dog"],11,30,63,0],"1f437":[["🐷"],"","󾆿",["pig"],11,31,63,0],"1f438":[["🐸"],"","󾇗",["frog"],11,32,63,0],"1f439":[["🐹"],"","󾇊",["hamster"],11,33,63,0],"1f43a":[["🐺"],"","󾇐",["wolf"],11,34,63,0],"1f43b":[["🐻"],"","󾇁",["bear"],11,35,63,0],"1f43c":[["🐼"],"","󾇟",["panda_face"],11,36,63,0],"1f43d":[["🐽"],"","󾇠",["pig_nose"],11,37,63,0],"1f43e":[["🐾"],"","󾇛",["feet","paw_prints"],11,38,63,0],"1f43f":[["🐿"],"","",["chipmunk"],11,39,31,0],"1f440":[["👀"],"","󾆐",["eyes"],11,40,63,0],"1f441":[["👁"],"","",["eye"],11,41,31,0],"1f442":[["👂"],"","󾆑",["ear"],11,42,63,0],"1f443":[["👃"],"","󾆒",["nose"],11,48,63,0],"1f444":[["👄"],"","󾆓",["lips"],12,5,63,0],"1f445":[["👅"],"","󾆔",["tongue"],12,6,63,0],"1f446":[["👆"],"","󾮙",["point_up_2"],12,7,63,0],"1f447":[["👇"],"","󾮚",["point_down"],12,13,63,0],"1f448":[["👈"],"","󾮛",["point_left"],12,19,63,0],"1f449":[["👉"],"","󾮜",["point_right"],12,25,63,0],"1f44a":[["👊"],"","󾮖",["facepunch","punch"],12,31,63,0],"1f44b":[["👋"],"","󾮝",["wave"],12,37,63,0],"1f44c":[["👌"],"","󾮟",["ok_hand"],12,43,63,0],"1f44d":[["👍"],"","󾮗",["+1","thumbsup"],13,0,63,0],"1f44e":[["👎"],"","󾮠",["-1","thumbsdown"],13,6,63,0],"1f44f":[["👏"],"","󾮞",["clap"],13,12,63,0],"1f450":[["👐"],"","󾮡",["open_hands"],13,18,63,0],"1f451":[["👑"],"","󾓑",["crown"],13,24,63,0],"1f452":[["👒"],"","󾓔",["womans_hat"],13,25,63,0],"1f453":[["👓"],"","󾓎",["eyeglasses"],13,26,63,0],"1f454":[["👔"],"","󾓓",["necktie"],13,27,63,0],"1f455":[["👕"],"","󾓏",["shirt","tshirt"],13,28,63,0],"1f456":[["👖"],"","󾓐",["jeans"],13,29,63,0],"1f457":[["👗"],"","󾓕",["dress"],13,30,63,0],"1f458":[["👘"],"","󾓙",["kimono"],13,31,63,0],"1f459":[["👙"],"","󾓚",["bikini"],13,32,63,0],"1f45a":[["👚"],"","󾓛",["womans_clothes"],13,33,63,0],"1f45b":[["👛"],"","󾓜",["purse"],13,34,63,0],"1f45c":[["👜"],"","󾓰",["handbag"],13,35,63,0],"1f45d":[["👝"],"","󾓱",["pouch"],13,36,63,0],"1f45e":[["👞"],"","󾓌",["mans_shoe","shoe"],13,37,63,0],"1f45f":[["👟"],"","󾓍",["athletic_shoe"],13,38,63,0],"1f460":[["👠"],"","󾓖",["high_heel"],13,39,63,0],"1f461":[["👡"],"","󾓗",["sandal"],13,40,63,0],"1f462":[["👢"],"","󾓘",["boot"],13,41,63,0],"1f463":[["👣"],"","󾕓",["footprints"],13,42,63,0],"1f464":[["👤"],"","󾆚",["bust_in_silhouette"],13,43,63,0],"1f465":[["👥"],"","",["busts_in_silhouette"],13,44,63,0],"1f466":[["👦"],"","󾆛",["boy"],13,45,63,0],"1f467":[["👧"],"","󾆜",["girl"],14,2,63,0],"1f468":[["👨"],"","󾆝",["man"],14,8,63,0],"1f469":[["👩"],"","󾆞",["woman"],14,14,63,0],"1f46b":[["👫"],"","󾆠",["couple","man_and_woman_holding_hands"],14,21,63,0],"1f46c":[["👬"],"","",["two_men_holding_hands"],14,22,63,0],"1f46d":[["👭"],"","",["two_women_holding_hands"],14,23,63,0],"1f470":[["👰"],"","󾆣",["bride_with_veil"],14,31,63,0],"1f472":[["👲"],"","󾆥",["man_with_gua_pi_mao"],14,43,63,0],"1f474":[["👴"],"","󾆧",["older_man"],15,6,63,0],"1f475":[["👵"],"","󾆨",["older_woman"],15,12,63,0],"1f476":[["👶"],"","󾆩",["baby"],15,18,63,0],"1f478":[["👸"],"","󾆫",["princess"],15,30,63,0],"1f479":[["👹"],"","󾆬",["japanese_ogre"],15,36,63,0],"1f47a":[["👺"],"","󾆭",["japanese_goblin"],15,37,63,0],"1f47b":[["👻"],"","󾆮",["ghost"],15,38,63,0],"1f47c":[["👼"],"","󾆯",["angel"],15,39,63,0],"1f47d":[["👽"],"","󾆰",["alien"],15,45,63,0],"1f47e":[["👾"],"","󾆱",["space_invader"],15,46,63,0],"1f47f":[["👿"],"","󾆲",["imp"],15,47,63,0],"1f480":[["💀"],"","󾆳",["skull"],15,48,63,0],"1f483":[["💃"],"","󾆶",["dancer"],16,12,63,0],"1f484":[["💄"],"","󾆕",["lipstick"],16,18,63,0],"1f485":[["💅"],"","󾆖",["nail_care"],16,19,63,0],"1f488":[["💈"],"","󾆙",["barber"],16,37,63,0],"1f489":[["💉"],"","󾔉",["syringe"],16,38,63,0],"1f48a":[["💊"],"","󾔊",["pill"],16,39,63,0],"1f48b":[["💋"],"","󾠣",["kiss"],16,40,63,0],"1f48c":[["💌"],"","󾠤",["love_letter"],16,41,63,0],"1f48d":[["💍"],"","󾠥",["ring"],16,42,63,0],"1f48e":[["💎"],"","󾠦",["gem"],16,43,63,0],"1f490":[["💐"],"","󾠨",["bouquet"],16,45,63,0],"1f492":[["💒"],"","󾠪",["wedding"],16,47,63,0],"1f493":[["💓"],"","󾬍",["heartbeat"],16,48,63,0],"1f494":[["💔"],"","󾬎",["broken_heart"],17,0,63,0,"</3"],"1f495":[["💕"],"","󾬏",["two_hearts"],17,1,63,0],"1f496":[["💖"],"","󾬐",["sparkling_heart"],17,2,63,0],"1f497":[["💗"],"","󾬑",["heartpulse"],17,3,63,0],"1f498":[["💘"],"","󾬒",["cupid"],17,4,63,0],"1f499":[["💙"],"","󾬓",["blue_heart"],17,5,63,0,"<3"],"1f49a":[["💚"],"","󾬔",["green_heart"],17,6,63,0,"<3"],"1f49b":[["💛"],"","󾬕",["yellow_heart"],17,7,63,0,"<3"],"1f49c":[["💜"],"","󾬖",["purple_heart"],17,8,63,0,"<3"],"1f49d":[["💝"],"","󾬗",["gift_heart"],17,9,63,0],"1f49e":[["💞"],"","󾬘",["revolving_hearts"],17,10,63,0],"1f49f":[["💟"],"","󾬙",["heart_decoration"],17,11,63,0],"1f4a0":[["💠"],"","󾭕",["diamond_shape_with_a_dot_inside"],17,12,63,0],"1f4a1":[["💡"],"","󾭖",["bulb"],17,13,63,0],"1f4a2":[["💢"],"","󾭗",["anger"],17,14,63,0],"1f4a3":[["💣"],"","󾭘",["bomb"],17,15,63,0],"1f4a4":[["💤"],"","󾭙",["zzz"],17,16,63,0],"1f4a5":[["💥"],"","󾭚",["boom","collision"],17,17,63,0],"1f4a6":[["💦"],"","󾭛",["sweat_drops"],17,18,63,0],"1f4a7":[["💧"],"","󾭜",["droplet"],17,19,63,0],"1f4a8":[["💨"],"","󾭝",["dash"],17,20,63,0],"1f4a9":[["💩"],"","󾓴",["hankey","poop","shit"],17,21,63,0],"1f4aa":[["💪"],"","󾭞",["muscle"],17,22,63,0],"1f4ab":[["💫"],"","󾭟",["dizzy"],17,28,63,0],"1f4ac":[["💬"],"","󾔲",["speech_balloon"],17,29,63,0],"1f4ad":[["💭"],"","",["thought_balloon"],17,30,63,0],"1f4ae":[["💮"],"","󾭺",["white_flower"],17,31,63,0],"1f4af":[["💯"],"","󾭻",["100"],17,32,63,0],"1f4b0":[["💰"],"","󾓝",["moneybag"],17,33,63,0],"1f4b1":[["💱"],"","󾓞",["currency_exchange"],17,34,63,0],"1f4b2":[["💲"],"","󾓠",["heavy_dollar_sign"],17,35,63,0],"1f4b3":[["💳"],"","󾓡",["credit_card"],17,36,63,0],"1f4b4":[["💴"],"","󾓢",["yen"],17,37,63,0],"1f4b5":[["💵"],"","󾓣",["dollar"],17,38,63,0],"1f4b6":[["💶"],"","",["euro"],17,39,63,0],"1f4b7":[["💷"],"","",["pound"],17,40,63,0],"1f4b8":[["💸"],"","󾓤",["money_with_wings"],17,41,63,0],"1f4b9":[["💹"],"","󾓟",["chart"],17,42,63,0],"1f4ba":[["💺"],"","󾔷",["seat"],17,43,63,0],"1f4bb":[["💻"],"","󾔸",["computer"],17,44,63,0],"1f4bc":[["💼"],"","󾔻",["briefcase"],17,45,63,0],"1f4bd":[["💽"],"","󾔼",["minidisc"],17,46,63,0],"1f4be":[["💾"],"","󾔽",["floppy_disk"],17,47,63,0],"1f4bf":[["💿"],"","󾠝",["cd"],17,48,63,0],"1f4c0":[["📀"],"","󾠞",["dvd"],18,0,63,0],"1f4c1":[["📁"],"","󾕃",["file_folder"],18,1,63,0],"1f4c2":[["📂"],"","󾕄",["open_file_folder"],18,2,63,0],"1f4c3":[["📃"],"","󾕀",["page_with_curl"],18,3,63,0],"1f4c4":[["📄"],"","󾕁",["page_facing_up"],18,4,63,0],"1f4c5":[["📅"],"","󾕂",["date"],18,5,63,0],"1f4c6":[["📆"],"","󾕉",["calendar"],18,6,63,0],"1f4c7":[["📇"],"","󾕍",["card_index"],18,7,63,0],"1f4c8":[["📈"],"","󾕋",["chart_with_upwards_trend"],18,8,63,0],"1f4c9":[["📉"],"","󾕌",["chart_with_downwards_trend"],18,9,63,0],"1f4ca":[["📊"],"","󾕊",["bar_chart"],18,10,63,0],"1f4cb":[["📋"],"","󾕈",["clipboard"],18,11,63,0],"1f4cc":[["📌"],"","󾕎",["pushpin"],18,12,63,0],"1f4cd":[["📍"],"","󾔿",["round_pushpin"],18,13,63,0],"1f4ce":[["📎"],"","󾔺",["paperclip"],18,14,63,0],"1f4cf":[["📏"],"","󾕐",["straight_ruler"],18,15,63,0],"1f4d0":[["📐"],"","󾕑",["triangular_ruler"],18,16,63,0],"1f4d1":[["📑"],"","󾕒",["bookmark_tabs"],18,17,63,0],"1f4d2":[["📒"],"","󾕏",["ledger"],18,18,63,0],"1f4d3":[["📓"],"","󾕅",["notebook"],18,19,63,0],"1f4d4":[["📔"],"","󾕇",["notebook_with_decorative_cover"],18,20,63,0],"1f4d5":[["📕"],"","󾔂",["closed_book"],18,21,63,0],"1f4d6":[["📖"],"","󾕆",["book","open_book"],18,22,63,0],"1f4d7":[["📗"],"","󾓿",["green_book"],18,23,63,0],"1f4d8":[["📘"],"","󾔀",["blue_book"],18,24,63,0],"1f4d9":[["📙"],"","󾔁",["orange_book"],18,25,63,0],"1f4da":[["📚"],"","󾔃",["books"],18,26,63,0],"1f4db":[["📛"],"","󾔄",["name_badge"],18,27,63,0],"1f4dc":[["📜"],"","󾓽",["scroll"],18,28,63,0],"1f4dd":[["📝"],"","󾔧",["memo","pencil"],18,29,63,0],"1f4de":[["📞"],"","󾔤",["telephone_receiver"],18,30,63,0],"1f4df":[["📟"],"","󾔢",["pager"],18,31,63,0],"1f4e0":[["📠"],"","󾔨",["fax"],18,32,63,0],"1f4e1":[["📡"],"","󾔱",["satellite_antenna"],18,33,63,0],"1f4e2":[["📢"],"","󾔯",["loudspeaker"],18,34,63,0],"1f4e3":[["📣"],"","󾔰",["mega"],18,35,63,0],"1f4e4":[["📤"],"","󾔳",["outbox_tray"],18,36,63,0],"1f4e5":[["📥"],"","󾔴",["inbox_tray"],18,37,63,0],"1f4e6":[["📦"],"","󾔵",["package"],18,38,63,0],"1f4e7":[["📧"],"","󾮒",["e-mail"],18,39,63,0],"1f4e8":[["📨"],"","󾔪",["incoming_envelope"],18,40,63,0],"1f4e9":[["📩"],"","󾔫",["envelope_with_arrow"],18,41,63,0],"1f4ea":[["📪"],"","󾔬",["mailbox_closed"],18,42,63,0],"1f4eb":[["📫"],"","󾔭",["mailbox"],18,43,63,0],"1f4ec":[["📬"],"","",["mailbox_with_mail"],18,44,63,0],"1f4ed":[["📭"],"","",["mailbox_with_no_mail"],18,45,63,0],"1f4ee":[["📮"],"","󾔮",["postbox"],18,46,63,0],"1f4ef":[["📯"],"","",["postal_horn"],18,47,63,0],"1f4f0":[["📰"],"","󾠢",["newspaper"],18,48,63,0],"1f4f1":[["📱"],"","󾔥",["iphone"],19,0,63,0],"1f4f2":[["📲"],"","󾔦",["calling"],19,1,63,0],"1f4f3":[["📳"],"","󾠹",["vibration_mode"],19,2,63,0],"1f4f4":[["📴"],"","󾠺",["mobile_phone_off"],19,3,63,0],"1f4f5":[["📵"],"","",["no_mobile_phones"],19,4,63,0],"1f4f6":[["📶"],"","󾠸",["signal_strength"],19,5,63,0],"1f4f7":[["📷"],"","󾓯",["camera"],19,6,63,0],"1f4f8":[["📸"],"","",["camera_with_flash"],19,7,31,0],"1f4f9":[["📹"],"","󾓹",["video_camera"],19,8,63,0],"1f4fa":[["📺"],"","󾠜",["tv"],19,9,63,0],"1f4fb":[["📻"],"","󾠟",["radio"],19,10,63,0],"1f4fc":[["📼"],"","󾠠",["vhs"],19,11,63,0],"1f4fd":[["📽"],"","",["film_projector"],19,12,31,0],"1f4ff":[["📿"],"","",["prayer_beads"],19,13,31,0],"1f500":[["🔀"],"","",["twisted_rightwards_arrows"],19,14,63,0],"1f501":[["🔁"],"","",["repeat"],19,15,63,0],"1f502":[["🔂"],"","",["repeat_one"],19,16,63,0],"1f503":[["🔃"],"","󾮑",["arrows_clockwise"],19,17,63,0],"1f504":[["🔄"],"","",["arrows_counterclockwise"],19,18,63,0],"1f505":[["🔅"],"","",["low_brightness"],19,19,63,0],"1f506":[["🔆"],"","",["high_brightness"],19,20,63,0],"1f507":[["🔇"],"","",["mute"],19,21,63,0],"1f508":[["🔈"],"","",["speaker"],19,22,63,0],"1f509":[["🔉"],"","",["sound"],19,23,63,0],"1f50a":[["🔊"],"","󾠡",["loud_sound"],19,24,63,0],"1f50b":[["🔋"],"","󾓼",["battery"],19,25,63,0],"1f50c":[["🔌"],"","󾓾",["electric_plug"],19,26,63,0],"1f50d":[["🔍"],"","󾮅",["mag"],19,27,63,0],"1f50e":[["🔎"],"","󾮍",["mag_right"],19,28,63,0],"1f50f":[["🔏"],"","󾮐",["lock_with_ink_pen"],19,29,63,0],"1f510":[["🔐"],"","󾮊",["closed_lock_with_key"],19,30,63,0],"1f511":[["🔑"],"","󾮂",["key"],19,31,63,0],"1f512":[["🔒"],"","󾮆",["lock"],19,32,63,0],"1f513":[["🔓"],"","󾮇",["unlock"],19,33,63,0],"1f514":[["🔔"],"","󾓲",["bell"],19,34,63,0],"1f515":[["🔕"],"","",["no_bell"],19,35,63,0],"1f516":[["🔖"],"","󾮏",["bookmark"],19,36,63,0],"1f517":[["🔗"],"","󾭋",["link"],19,37,63,0],"1f518":[["🔘"],"","󾮌",["radio_button"],19,38,63,0],"1f519":[["🔙"],"","󾮎",["back"],19,39,63,0],"1f51a":[["🔚"],"","󾀚",["end"],19,40,63,0],"1f51b":[["🔛"],"","󾀙",["on"],19,41,63,0],"1f51c":[["🔜"],"","󾀘",["soon"],19,42,63,0],"1f51d":[["🔝"],"","󾭂",["top"],19,43,63,0],"1f51e":[["🔞"],"","󾬥",["underage"],19,44,63,0],"1f51f":[["🔟"],"","󾠻",["keycap_ten"],19,45,63,0],"1f520":[["🔠"],"","󾭼",["capital_abcd"],19,46,63,0],"1f521":[["🔡"],"","󾭽",["abcd"],19,47,63,0],"1f522":[["🔢"],"","󾭾",["1234"],19,48,63,0],"1f523":[["🔣"],"","󾭿",["symbols"],20,0,63,0],"1f524":[["🔤"],"","󾮀",["abc"],20,1,63,0],"1f525":[["🔥"],"","󾓶",["fire"],20,2,63,0],"1f526":[["🔦"],"","󾓻",["flashlight"],20,3,63,0],"1f527":[["🔧"],"","󾓉",["wrench"],20,4,63,0],"1f528":[["🔨"],"","󾓊",["hammer"],20,5,63,0],"1f529":[["🔩"],"","󾓋",["nut_and_bolt"],20,6,63,0],"1f52a":[["🔪"],"","󾓺",["hocho","knife"],20,7,63,0],"1f52b":[["🔫"],"","󾓵",["gun"],20,8,63,0],"1f52c":[["🔬"],"","",["microscope"],20,9,63,0],"1f52d":[["🔭"],"","",["telescope"],20,10,63,0],"1f52e":[["🔮"],"","󾓷",["crystal_ball"],20,11,63,0],"1f52f":[["🔯"],"","󾓸",["six_pointed_star"],20,12,63,0],"1f530":[["🔰"],"","󾁄",["beginner"],20,13,63,0],"1f531":[["🔱"],"","󾓒",["trident"],20,14,63,0],"1f532":[["🔲"],"","󾭤",["black_square_button"],20,15,63,0],"1f533":[["🔳"],"","󾭧",["white_square_button"],20,16,63,0],"1f534":[["🔴"],"","󾭣",["red_circle"],20,17,63,0],"1f535":[["🔵"],"","󾭤",["large_blue_circle"],20,18,63,0],
 "1f536":[["🔶"],"","󾭳",["large_orange_diamond"],20,19,63,0],"1f537":[["🔷"],"","󾭴",["large_blue_diamond"],20,20,63,0],"1f538":[["🔸"],"","󾭵",["small_orange_diamond"],20,21,63,0],"1f539":[["🔹"],"","󾭶",["small_blue_diamond"],20,22,63,0],"1f53a":[["🔺"],"","󾭸",["small_red_triangle"],20,23,63,0],"1f53b":[["🔻"],"","󾭹",["small_red_triangle_down"],20,24,63,0],"1f53c":[["🔼"],"","󾬁",["arrow_up_small"],20,25,63,0],"1f53d":[["🔽"],"","󾬀",["arrow_down_small"],20,26,63,0],"1f549":[["🕉"],"","",["om_symbol"],20,27,31,0],"1f54a":[["🕊"],"","",["dove_of_peace"],20,28,31,0],"1f54b":[["🕋"],"","",["kaaba"],20,29,31,0],"1f54c":[["🕌"],"","",["mosque"],20,30,31,0],"1f54d":[["🕍"],"","",["synagogue"],20,31,31,0],"1f54e":[["🕎"],"","",["menorah_with_nine_branches"],20,32,31,0],"1f550":[["🕐"],"","󾀞",["clock1"],20,33,63,0],"1f551":[["🕑"],"","󾀟",["clock2"],20,34,63,0],"1f552":[["🕒"],"","󾀠",["clock3"],20,35,63,0],"1f553":[["🕓"],"","󾀡",["clock4"],20,36,63,0],"1f554":[["🕔"],"","󾀢",["clock5"],20,37,63,0],"1f555":[["🕕"],"","󾀣",["clock6"],20,38,63,0],"1f556":[["🕖"],"","󾀤",["clock7"],20,39,63,0],"1f557":[["🕗"],"","󾀥",["clock8"],20,40,63,0],"1f558":[["🕘"],"","󾀦",["clock9"],20,41,63,0],"1f559":[["🕙"],"","󾀧",["clock10"],20,42,63,0],"1f55a":[["🕚"],"","󾀨",["clock11"],20,43,63,0],"1f55b":[["🕛"],"","󾀩",["clock12"],20,44,63,0],"1f55c":[["🕜"],"","",["clock130"],20,45,63,0],"1f55d":[["🕝"],"","",["clock230"],20,46,63,0],"1f55e":[["🕞"],"","",["clock330"],20,47,63,0],"1f55f":[["🕟"],"","",["clock430"],20,48,63,0],"1f560":[["🕠"],"","",["clock530"],21,0,63,0],"1f561":[["🕡"],"","",["clock630"],21,1,63,0],"1f562":[["🕢"],"","",["clock730"],21,2,63,0],"1f563":[["🕣"],"","",["clock830"],21,3,63,0],"1f564":[["🕤"],"","",["clock930"],21,4,63,0],"1f565":[["🕥"],"","",["clock1030"],21,5,63,0],"1f566":[["🕦"],"","",["clock1130"],21,6,63,0],"1f567":[["🕧"],"","",["clock1230"],21,7,63,0],"1f56f":[["🕯"],"","",["candle"],21,8,31,0],"1f570":[["🕰"],"","",["mantelpiece_clock"],21,9,31,0],"1f573":[["🕳"],"","",["hole"],21,10,31,0],"1f574":[["🕴"],"","",["man_in_business_suit_levitating"],21,11,31,0],"1f576":[["🕶"],"","",["dark_sunglasses"],21,23,31,0],"1f577":[["🕷"],"","",["spider"],21,24,31,0],"1f578":[["🕸"],"","",["spider_web"],21,25,31,0],"1f579":[["🕹"],"","",["joystick"],21,26,31,0],"1f57a":[["🕺"],"","",["man_dancing"],21,27,31,0],"1f587":[["🖇"],"","",["linked_paperclips"],21,33,31,0],"1f58a":[["🖊"],"","",["lower_left_ballpoint_pen"],21,34,31,0],"1f58b":[["🖋"],"","",["lower_left_fountain_pen"],21,35,31,0],"1f58c":[["🖌"],"","",["lower_left_paintbrush"],21,36,31,0],"1f58d":[["🖍"],"","",["lower_left_crayon"],21,37,31,0],"1f590":[["🖐"],"","",["raised_hand_with_fingers_splayed"],21,38,31,0],"1f595":[["🖕"],"","",["middle_finger","reversed_hand_with_middle_finger_extended"],21,44,31,0],"1f596":[["🖖"],"","",["spock-hand"],22,1,31,0],"1f5a4":[["🖤"],"","",["black_heart"],22,7,31,0],"1f5a5":[["🖥"],"","",["desktop_computer"],22,8,31,0],"1f5a8":[["🖨"],"","",["printer"],22,9,31,0],"1f5b1":[["🖱"],"","",["three_button_mouse"],22,10,31,0],"1f5b2":[["🖲"],"","",["trackball"],22,11,31,0],"1f5bc":[["🖼"],"","",["frame_with_picture"],22,12,31,0],"1f5c2":[["🗂"],"","",["card_index_dividers"],22,13,31,0],"1f5c3":[["🗃"],"","",["card_file_box"],22,14,31,0],"1f5c4":[["🗄"],"","",["file_cabinet"],22,15,31,0],"1f5d1":[["🗑"],"","",["wastebasket"],22,16,31,0],"1f5d2":[["🗒"],"","",["spiral_note_pad"],22,17,31,0],"1f5d3":[["🗓"],"","",["spiral_calendar_pad"],22,18,31,0],"1f5dc":[["🗜"],"","",["compression"],22,19,31,0],"1f5dd":[["🗝"],"","",["old_key"],22,20,31,0],"1f5de":[["🗞"],"","",["rolled_up_newspaper"],22,21,31,0],"1f5e1":[["🗡"],"","",["dagger_knife"],22,22,31,0],"1f5e3":[["🗣"],"","",["speaking_head_in_silhouette"],22,23,31,0],"1f5e8":[["🗨"],"","",["left_speech_bubble"],22,24,31,0],"1f5ef":[["🗯"],"","",["right_anger_bubble"],22,25,31,0],"1f5f3":[["🗳"],"","",["ballot_box_with_ballot"],22,26,31,0],"1f5fa":[["🗺"],"","",["world_map"],22,27,31,0],"1f5fb":[["🗻"],"","󾓃",["mount_fuji"],22,28,63,0],"1f5fc":[["🗼"],"","󾓄",["tokyo_tower"],22,29,63,0],"1f5fd":[["🗽"],"","󾓆",["statue_of_liberty"],22,30,63,0],"1f5fe":[["🗾"],"","󾓇",["japan"],22,31,63,0],"1f5ff":[["🗿"],"","󾓈",["moyai"],22,32,63,0],"1f600":[["😀"],"","",["grinning"],22,33,63,0,":D"],"1f601":[["😁"],"","󾌳",["grin"],22,34,63,0],"1f602":[["😂"],"","󾌴",["joy"],22,35,63,0],"1f603":[["😃"],"","󾌰",["smiley"],22,36,63,0,":)"],"1f604":[["😄"],"","󾌸",["smile"],22,37,63,0,":)"],"1f605":[["😅"],"","󾌱",["sweat_smile"],22,38,63,0],"1f606":[["😆"],"","󾌲",["laughing","satisfied"],22,39,63,0],"1f607":[["😇"],"","",["innocent"],22,40,63,0],"1f608":[["😈"],"","",["smiling_imp"],22,41,63,0],"1f609":[["😉"],"","󾍇",["wink"],22,42,63,0,";)"],"1f60a":[["😊"],"","󾌵",["blush"],22,43,63,0,":)"],"1f60b":[["😋"],"","󾌫",["yum"],22,44,63,0],"1f60c":[["😌"],"","󾌾",["relieved"],22,45,63,0],"1f60d":[["😍"],"","󾌧",["heart_eyes"],22,46,63,0],"1f60e":[["😎"],"","",["sunglasses"],22,47,63,0],"1f60f":[["😏"],"","󾍃",["smirk"],22,48,63,0],"1f610":[["😐"],"","",["neutral_face"],23,0,63,0],"1f611":[["😑"],"","",["expressionless"],23,1,63,0],"1f612":[["😒"],"","󾌦",["unamused"],23,2,63,0,":("],"1f613":[["😓"],"","󾍄",["sweat"],23,3,63,0],"1f614":[["😔"],"","󾍀",["pensive"],23,4,63,0],"1f615":[["😕"],"","",["confused"],23,5,63,0],"1f616":[["😖"],"","󾌿",["confounded"],23,6,63,0],"1f617":[["😗"],"","",["kissing"],23,7,63,0],"1f618":[["😘"],"","󾌬",["kissing_heart"],23,8,63,0],"1f619":[["😙"],"","",["kissing_smiling_eyes"],23,9,63,0],"1f61a":[["😚"],"","󾌭",["kissing_closed_eyes"],23,10,63,0],"1f61b":[["😛"],"","",["stuck_out_tongue"],23,11,63,0,":p"],"1f61c":[["😜"],"","󾌩",["stuck_out_tongue_winking_eye"],23,12,63,0,";p"],"1f61d":[["😝"],"","󾌪",["stuck_out_tongue_closed_eyes"],23,13,63,0],"1f61e":[["😞"],"","󾌣",["disappointed"],23,14,63,0,":("],"1f61f":[["😟"],"","",["worried"],23,15,63,0],"1f620":[["😠"],"","󾌠",["angry"],23,16,63,0],"1f621":[["😡"],"","󾌽",["rage"],23,17,63,0],"1f622":[["😢"],"","󾌹",["cry"],23,18,63,0,":'("],"1f623":[["😣"],"","󾌼",["persevere"],23,19,63,0],"1f624":[["😤"],"","󾌨",["triumph"],23,20,63,0],"1f625":[["😥"],"","󾍅",["disappointed_relieved"],23,21,63,0],"1f626":[["😦"],"","",["frowning"],23,22,63,0],"1f627":[["😧"],"","",["anguished"],23,23,63,0],"1f628":[["😨"],"","󾌻",["fearful"],23,24,63,0],"1f629":[["😩"],"","󾌡",["weary"],23,25,63,0],"1f62a":[["😪"],"","󾍂",["sleepy"],23,26,63,0],"1f62b":[["😫"],"","󾍆",["tired_face"],23,27,63,0],"1f62c":[["😬"],"","",["grimacing"],23,28,63,0],"1f62d":[["😭"],"","󾌺",["sob"],23,29,63,0,":'("],"1f62e":[["😮"],"","",["open_mouth"],23,30,63,0],"1f62f":[["😯"],"","",["hushed"],23,31,63,0],"1f630":[["😰"],"","󾌥",["cold_sweat"],23,32,63,0],"1f631":[["😱"],"","󾍁",["scream"],23,33,63,0],"1f632":[["😲"],"","󾌢",["astonished"],23,34,63,0],"1f633":[["😳"],"","󾌯",["flushed"],23,35,63,0],"1f634":[["😴"],"","",["sleeping"],23,36,63,0],"1f635":[["😵"],"","󾌤",["dizzy_face"],23,37,63,0],"1f636":[["😶"],"","",["no_mouth"],23,38,63,0],"1f637":[["😷"],"","󾌮",["mask"],23,39,63,0],"1f638":[["😸"],"","󾍉",["smile_cat"],23,40,63,0],"1f639":[["😹"],"","󾍊",["joy_cat"],23,41,63,0],"1f63a":[["😺"],"","󾍈",["smiley_cat"],23,42,63,0],"1f63b":[["😻"],"","󾍌",["heart_eyes_cat"],23,43,63,0],"1f63c":[["😼"],"","󾍏",["smirk_cat"],23,44,63,0],"1f63d":[["😽"],"","󾍋",["kissing_cat"],23,45,63,0],"1f63e":[["😾"],"","󾍎",["pouting_cat"],23,46,63,0],"1f63f":[["😿"],"","󾍍",["crying_cat_face"],23,47,63,0],"1f640":[["🙀"],"","󾍐",["scream_cat"],23,48,63,0],"1f641":[["🙁"],"","",["slightly_frowning_face"],24,0,31,0],"1f642":[["🙂"],"","",["slightly_smiling_face"],24,1,63,0],"1f643":[["🙃"],"","",["upside_down_face"],24,2,31,0],"1f644":[["🙄"],"","",["face_with_rolling_eyes"],24,3,31,0],"1f648":[["🙈"],"","󾍔",["see_no_evil"],24,22,63,0],"1f649":[["🙉"],"","󾍖",["hear_no_evil"],24,23,63,0],"1f64a":[["🙊"],"","󾍕",["speak_no_evil"],24,24,63,0],"1f64c":[["🙌"],"","󾍘",["raised_hands"],24,31,63,0],"1f64f":[["🙏"],"","󾍛",["pray"],25,0,63,0],"1f680":[["🚀"],"","󾟭",["rocket"],25,6,63,0],"1f681":[["🚁"],"","",["helicopter"],25,7,63,0],"1f682":[["🚂"],"","",["steam_locomotive"],25,8,63,0],"1f683":[["🚃"],"","󾟟",["railway_car"],25,9,63,0],"1f684":[["🚄"],"","󾟢",["bullettrain_side"],25,10,63,0],"1f685":[["🚅"],"","󾟣",["bullettrain_front"],25,11,63,0],"1f686":[["🚆"],"","",["train2"],25,12,63,0],"1f687":[["🚇"],"","󾟠",["metro"],25,13,63,0],"1f688":[["🚈"],"","",["light_rail"],25,14,63,0],"1f689":[["🚉"],"","󾟬",["station"],25,15,63,0],"1f68a":[["🚊"],"","",["tram"],25,16,63,0],"1f68b":[["🚋"],"","",["train"],25,17,63,0],"1f68c":[["🚌"],"","󾟦",["bus"],25,18,63,0],"1f68d":[["🚍"],"","",["oncoming_bus"],25,19,63,0],"1f68e":[["🚎"],"","",["trolleybus"],25,20,63,0],"1f68f":[["🚏"],"","󾟧",["busstop"],25,21,63,0],"1f690":[["🚐"],"","",["minibus"],25,22,63,0],"1f691":[["🚑"],"","󾟳",["ambulance"],25,23,63,0],"1f692":[["🚒"],"","󾟲",["fire_engine"],25,24,63,0],"1f693":[["🚓"],"","󾟴",["police_car"],25,25,63,0],"1f694":[["🚔"],"","",["oncoming_police_car"],25,26,63,0],"1f695":[["🚕"],"","󾟯",["taxi"],25,27,63,0],"1f696":[["🚖"],"","",["oncoming_taxi"],25,28,63,0],"1f697":[["🚗"],"","󾟤",["car","red_car"],25,29,63,0],"1f698":[["🚘"],"","",["oncoming_automobile"],25,30,63,0],"1f699":[["🚙"],"","󾟥",["blue_car"],25,31,63,0],"1f69a":[["🚚"],"","󾟱",["truck"],25,32,63,0],"1f69b":[["🚛"],"","",["articulated_lorry"],25,33,63,0],"1f69c":[["🚜"],"","",["tractor"],25,34,63,0],"1f69d":[["🚝"],"","",["monorail"],25,35,63,0],"1f69e":[["🚞"],"","",["mountain_railway"],25,36,63,0],"1f69f":[["🚟"],"","",["suspension_railway"],25,37,63,0],"1f6a0":[["🚠"],"","",["mountain_cableway"],25,38,63,0],"1f6a1":[["🚡"],"","",["aerial_tramway"],25,39,63,0],"1f6a2":[["🚢"],"","󾟨",["ship"],25,40,63,0],"1f6a4":[["🚤"],"","󾟮",["speedboat"],25,47,63,0],"1f6a5":[["🚥"],"","󾟷",["traffic_light"],25,48,63,0],"1f6a6":[["🚦"],"","",["vertical_traffic_light"],26,0,63,0],"1f6a7":[["🚧"],"","󾟸",["construction"],26,1,63,0],"1f6a8":[["🚨"],"","󾟹",["rotating_light"],26,2,63,0],"1f6a9":[["🚩"],"","󾬢",["triangular_flag_on_post"],26,3,63,0],"1f6aa":[["🚪"],"","󾓳",["door"],26,4,63,0],"1f6ab":[["🚫"],"","󾭈",["no_entry_sign"],26,5,63,0],"1f6ac":[["🚬"],"","󾬞",["smoking"],26,6,63,0],"1f6ad":[["🚭"],"","󾬟",["no_smoking"],26,7,63,0],"1f6ae":[["🚮"],"","",["put_litter_in_its_place"],26,8,63,0],"1f6af":[["🚯"],"","",["do_not_litter"],26,9,63,0],"1f6b0":[["🚰"],"","",["potable_water"],26,10,63,0],"1f6b1":[["🚱"],"","",["non-potable_water"],26,11,63,0],"1f6b2":[["🚲"],"","󾟫",["bike"],26,12,63,0],"1f6b3":[["🚳"],"","",["no_bicycles"],26,13,63,0],"1f6b7":[["🚷"],"","",["no_pedestrians"],26,32,63,0],"1f6b8":[["🚸"],"","",["children_crossing"],26,33,63,0],"1f6b9":[["🚹"],"","󾬳",["mens"],26,34,63,0],"1f6ba":[["🚺"],"","󾬴",["womens"],26,35,63,0],"1f6bb":[["🚻"],"","󾔆",["restroom"],26,36,63,0],"1f6bc":[["🚼"],"","󾬵",["baby_symbol"],26,37,63,0],"1f6bd":[["🚽"],"","󾔇",["toilet"],26,38,63,0],"1f6be":[["🚾"],"","󾔈",["wc"],26,39,63,0],"1f6bf":[["🚿"],"","",["shower"],26,40,63,0],"1f6c0":[["🛀"],"","󾔅",["bath"],26,41,63,0],"1f6c1":[["🛁"],"","",["bathtub"],26,47,63,0],"1f6c2":[["🛂"],"","",["passport_control"],26,48,63,0],"1f6c3":[["🛃"],"","",["customs"],27,0,63,0],"1f6c4":[["🛄"],"","",["baggage_claim"],27,1,63,0],"1f6c5":[["🛅"],"","",["left_luggage"],27,2,63,0],"1f6cb":[["🛋"],"","",["couch_and_lamp"],27,3,31,0],"1f6cc":[["🛌"],"","",["sleeping_accommodation"],27,4,31,0],"1f6cd":[["🛍"],"","",["shopping_bags"],27,10,31,0],"1f6ce":[["🛎"],"","",["bellhop_bell"],27,11,31,0],"1f6cf":[["🛏"],"","",["bed"],27,12,31,0],"1f6d0":[["🛐"],"","",["place_of_worship"],27,13,31,0],"1f6d1":[["🛑"],"","",["octagonal_sign"],27,14,31,0],"1f6d2":[["🛒"],"","",["shopping_trolley"],27,15,31,0],"1f6e0":[["🛠"],"","",["hammer_and_wrench"],27,16,31,0],"1f6e1":[["🛡"],"","",["shield"],27,17,31,0],"1f6e2":[["🛢"],"","",["oil_drum"],27,18,31,0],"1f6e3":[["🛣"],"","",["motorway"],27,19,31,0],"1f6e4":[["🛤"],"","",["railway_track"],27,20,31,0],"1f6e5":[["🛥"],"","",["motor_boat"],27,21,31,0],"1f6e9":[["🛩"],"","",["small_airplane"],27,22,31,0],"1f6eb":[["🛫"],"","",["airplane_departure"],27,23,31,0],"1f6ec":[["🛬"],"","",["airplane_arriving"],27,24,31,0],"1f6f0":[["🛰"],"","",["satellite"],27,25,31,0],"1f6f3":[["🛳"],"","",["passenger_ship"],27,26,31,0],"1f6f4":[["🛴"],"","",["scooter"],27,27,31,0],"1f6f5":[["🛵"],"","",["motor_scooter"],27,28,31,0],"1f6f6":[["🛶"],"","",["canoe"],27,29,31,0],"1f910":[["🤐"],"","",["zipper_mouth_face"],27,30,31,0],"1f911":[["🤑"],"","",["money_mouth_face"],27,31,31,0],"1f912":[["🤒"],"","",["face_with_thermometer"],27,32,31,0],"1f913":[["🤓"],"","",["nerd_face"],27,33,31,0],"1f914":[["🤔"],"","",["thinking_face"],27,34,31,0],"1f915":[["🤕"],"","",["face_with_head_bandage"],27,35,31,0],"1f916":[["🤖"],"","",["robot_face"],27,36,31,0],"1f917":[["🤗"],"","",["hugging_face"],27,37,31,0],"1f918":[["🤘"],"","",["the_horns","sign_of_the_horns"],27,38,31,0],"1f919":[["🤙"],"","",["call_me_hand"],27,44,31,0],"1f91a":[["🤚"],"","",["raised_back_of_hand"],28,1,31,0],"1f91b":[["🤛"],"","",["left-facing_fist"],28,7,31,0],"1f91c":[["🤜"],"","",["right-facing_fist"],28,13,31,0],"1f91d":[["🤝"],"","",["handshake"],28,19,31,0],"1f91e":[["🤞"],"","",["hand_with_index_and_middle_fingers_crossed"],28,20,31,0],"1f920":[["🤠"],"","",["face_with_cowboy_hat"],28,26,31,0],"1f921":[["🤡"],"","",["clown_face"],28,27,31,0],"1f922":[["🤢"],"","",["nauseated_face"],28,28,31,0],"1f923":[["🤣"],"","",["rolling_on_the_floor_laughing"],28,29,31,0],"1f924":[["🤤"],"","",["drooling_face"],28,30,31,0],"1f925":[["🤥"],"","",["lying_face"],28,31,31,0],"1f926":[["🤦"],"","",["face_palm"],28,32,31,0],"1f927":[["🤧"],"","",["sneezing_face"],28,38,31,0],"1f930":[["🤰"],"","",["pregnant_woman"],28,39,31,0],"1f933":[["🤳"],"","",["selfie"],28,45,31,0],"1f934":[["🤴"],"","",["prince"],29,2,31,0],"1f935":[["🤵"],"","",["man_in_tuxedo"],29,8,31,0],"1f936":[["🤶"],"","",["mother_christmas"],29,14,31,0],"1f937":[["🤷"],"","",["shrug"],29,20,31,0],"1f938":[["🤸"],"","",["person_doing_cartwheel"],29,26,31,0],"1f939":[["🤹"],"","",["juggling"],29,32,31,0],"1f93a":[["🤺"],"","",["fencer"],29,38,31,0],"1f93c":[["🤼"],"","",["wrestlers"],29,39,31,0],"1f93d":[["🤽"],"","",["water_polo"],29,40,31,0],"1f93e":[["🤾"],"","",["handball"],29,46,31,0],"1f940":[["🥀"],"","",["wilted_flower"],30,3,31,0],"1f941":[["🥁"],"","",["drum_with_drumsticks"],30,4,31,0],"1f942":[["🥂"],"","",["clinking_glasses"],30,5,31,0],"1f943":[["🥃"],"","",["tumbler_glass"],30,6,31,0],"1f944":[["🥄"],"","",["spoon"],30,7,31,0],"1f945":[["🥅"],"","",["goal_net"],30,8,31,0],"1f947":[["🥇"],"","",["first_place_medal"],30,9,31,0],"1f948":[["🥈"],"","",["second_place_medal"],30,10,31,0],"1f949":[["🥉"],"","",["third_place_medal"],30,11,31,0],"1f94a":[["🥊"],"","",["boxing_glove"],30,12,31,0],"1f94b":[["🥋"],"","",["martial_arts_uniform"],30,13,31,0],"1f950":[["🥐"],"","",["croissant"],30,14,31,0],"1f951":[["🥑"],"","",["avocado"],30,15,31,0],"1f952":[["🥒"],"","",["cucumber"],30,16,31,0],"1f953":[["🥓"],"","",["bacon"],30,17,31,0],"1f954":[["🥔"],"","",["potato"],30,18,31,0],"1f955":[["🥕"],"","",["carrot"],30,19,31,0],"1f956":[["🥖"],"","",["baguette_bread"],30,20,31,0],"1f957":[["🥗"],"","",["green_salad"],30,21,31,0],"1f958":[["🥘"],"","",["shallow_pan_of_food"],30,22,31,0],"1f959":[["🥙"],"","",["stuffed_flatbread"],30,23,31,0],"1f95a":[["🥚"],"","",["egg"],30,24,31,0],"1f95b":[["🥛"],"","",["glass_of_milk"],30,25,31,0],"1f95c":[["🥜"],"","",["peanuts"],30,26,31,0],"1f95d":[["🥝"],"","",["kiwifruit"],30,27,31,0],"1f95e":[["🥞"],"","",["pancakes"],30,28,31,0],"1f980":[["🦀"],"","",["crab"],30,29,31,0],"1f981":[["🦁"],"","",["lion_face"],30,30,31,0],"1f982":[["🦂"],"","",["scorpion"],30,31,31,0],"1f983":[["🦃"],"","",["turkey"],30,32,31,0],"1f984":[["🦄"],"","",["unicorn_face"],30,33,31,0],"1f985":[["🦅"],"","",["eagle"],30,34,31,0],"1f986":[["🦆"],"","",["duck"],30,35,31,0],"1f987":[["🦇"],"","",["bat"],30,36,31,0],"1f988":[["🦈"],"","",["shark"],30,37,31,0],"1f989":[["🦉"],"","",["owl"],30,38,31,0],"1f98a":[["🦊"],"","",["fox_face"],30,39,31,0],"1f98b":[["🦋"],"","",["butterfly"],30,40,31,0],"1f98c":[["🦌"],"","",["deer"],30,41,31,0],"1f98d":[["🦍"],"","",["gorilla"],30,42,31,0],"1f98e":[["🦎"],"","",["lizard"],30,43,31,0],"1f98f":[["🦏"],"","",["rhinoceros"],30,44,31,0],"1f990":[["🦐"],"","",["shrimp"],30,45,31,0],"1f991":[["🦑"],"","",["squid"],30,46,31,0],"1f9c0":[["🧀"],"","",["cheese_wedge"],30,47,31,0],"0023-20e3":[["#️⃣","#⃣"],"","󾠬",["hash"],30,48,15,0],"002a-20e3":[["*️⃣","*⃣"],"","",["keycap_star"],31,0,15,0],"0030-20e3":[["0️⃣","0⃣"],"","󾠷",["zero"],31,1,15,0],"0031-20e3":[["1️⃣","1⃣"],"","󾠮",["one"],31,2,15,0],"0032-20e3":[["2️⃣","2⃣"],"","󾠯",["two"],31,3,15,0],"0033-20e3":[["3️⃣","3⃣"],"","󾠰",["three"],31,4,15,0],"0034-20e3":[["4️⃣","4⃣"],"","󾠱",["four"],31,5,15,0],"0035-20e3":[["5️⃣","5⃣"],"","󾠲",["five"],31,6,15,0],"0036-20e3":[["6️⃣","6⃣"],"","󾠳",["six"],31,7,15,0],"0037-20e3":[["7️⃣","7⃣"],"","󾠴",["seven"],31,8,15,0],"0038-20e3":[["8️⃣","8⃣"],"","󾠵",["eight"],31,9,15,0],"0039-20e3":[["9️⃣","9⃣"],"","󾠶",["nine"],31,10,15,0],"1f1e6-1f1e8":[["🇦🇨"],"","",["flag-ac"],31,11,63,0],"1f1e6-1f1e9":[["🇦🇩"],"","",["flag-ad"],31,12,63,0],"1f1e6-1f1ea":[["🇦🇪"],"","",["flag-ae"],31,13,63,0],"1f1e6-1f1eb":[["🇦🇫"],"","",["flag-af"],31,14,63,0],"1f1e6-1f1ec":[["🇦🇬"],"","",["flag-ag"],31,15,63,0],"1f1e6-1f1ee":[["🇦🇮"],"","",["flag-ai"],31,16,63,0],"1f1e6-1f1f1":[["🇦🇱"],"","",["flag-al"],31,17,63,0],"1f1e6-1f1f2":[["🇦🇲"],"","",["flag-am"],31,18,63,0],"1f1e6-1f1f4":[["🇦🇴"],"","",["flag-ao"],31,19,63,0],"1f1e6-1f1f6":[["🇦🇶"],"","",["flag-aq"],31,20,63,0],"1f1e6-1f1f7":[["🇦🇷"],"","",["flag-ar"],31,21,63,0],"1f1e6-1f1f8":[["🇦🇸"],"","",["flag-as"],31,22,63,0],"1f1e6-1f1f9":[["🇦🇹"],"","",["flag-at"],31,23,63,0],"1f1e6-1f1fa":[["🇦🇺"],"","",["flag-au"],31,24,63,0],"1f1e6-1f1fc":[["🇦🇼"],"","",["flag-aw"],31,25,63,0],"1f1e6-1f1fd":[["🇦🇽"],"","",["flag-ax"],31,26,63,0],"1f1e6-1f1ff":[["🇦🇿"],"","",["flag-az"],31,27,63,0],"1f1e7-1f1e6":[["🇧🇦"],"","",["flag-ba"],31,28,31,0],"1f1e7-1f1e7":[["🇧🇧"],"","",["flag-bb"],31,29,63,0],"1f1e7-1f1e9":[["🇧🇩"],"","",["flag-bd"],31,30,63,0],"1f1e7-1f1ea":[["🇧🇪"],"","",["flag-be"],31,31,63,0],"1f1e7-1f1eb":[["🇧🇫"],"","",["flag-bf"],31,32,63,0],"1f1e7-1f1ec":[["🇧🇬"],"","",["flag-bg"],31,33,63,0],"1f1e7-1f1ed":[["🇧🇭"],"","",["flag-bh"],31,34,63,0],"1f1e7-1f1ee":[["🇧🇮"],"","",["flag-bi"],31,35,63,0],"1f1e7-1f1ef":[["🇧🇯"],"","",["flag-bj"],31,36,63,0],"1f1e7-1f1f1":[["🇧🇱"],"","",["flag-bl"],31,37,61,0],"1f1e7-1f1f2":[["🇧🇲"],"","",["flag-bm"],31,38,63,0],"1f1e7-1f1f3":[["🇧🇳"],"","",["flag-bn"],31,39,31,0],"1f1e7-1f1f4":[["🇧🇴"],"","",["flag-bo"],31,40,63,0],"1f1e7-1f1f6":[["🇧🇶"],"","",["flag-bq"],31,41,61,0],"1f1e7-1f1f7":[["🇧🇷"],"","",["flag-br"],31,42,63,0],"1f1e7-1f1f8":[["🇧🇸"],"","",["flag-bs"],31,43,63,0],"1f1e7-1f1f9":[["🇧🇹"],"","",["flag-bt"],31,44,63,0],"1f1e7-1f1fb":[["🇧🇻"],"","",["flag-bv"],31,45,61,0],"1f1e7-1f1fc":[["🇧🇼"],"","",["flag-bw"],31,46,63,0],"1f1e7-1f1fe":[["🇧🇾"],"","",["flag-by"],31,47,63,0],"1f1e7-1f1ff":[["🇧🇿"],"","",["flag-bz"],31,48,63,0],"1f1e8-1f1e6":[["🇨🇦"],"","",["flag-ca"],32,0,63,0],"1f1e8-1f1e8":[["🇨🇨"],"","",["flag-cc"],32,1,63,0],"1f1e8-1f1e9":[["🇨🇩"],"","",["flag-cd"],32,2,63,0],"1f1e8-1f1eb":[["🇨🇫"],"","",["flag-cf"],32,3,63,0],"1f1e8-1f1ec":[["🇨🇬"],"","",["flag-cg"],32,4,63,0],"1f1e8-1f1ed":[["🇨🇭"],"","",["flag-ch"],32,5,63,0],"1f1e8-1f1ee":[["🇨🇮"],"","",["flag-ci"],32,6,63,0],"1f1e8-1f1f0":[["🇨🇰"],"","",["flag-ck"],32,7,63,0],"1f1e8-1f1f1":[["🇨🇱"],"","",["flag-cl"],32,8,63,0],"1f1e8-1f1f2":[["🇨🇲"],"","",["flag-cm"],32,9,63,0],"1f1e8-1f1f3":[["🇨🇳"],"","󾓭",["flag-cn","cn"],32,10,63,0],"1f1e8-1f1f4":[["🇨🇴"],"","",["flag-co"],32,11,63,0],"1f1e8-1f1f5":[["🇨🇵"],"","",["flag-cp"],32,12,29,0],"1f1e8-1f1f7":[["🇨🇷"],"","",["flag-cr"],32,13,63,0],"1f1e8-1f1fa":[["🇨🇺"],"","",["flag-cu"],32,14,63,0],"1f1e8-1f1fb":[["🇨🇻"],"","",["flag-cv"],32,15,63,0],"1f1e8-1f1fc":[["🇨🇼"],"","",["flag-cw"],32,16,63,0],"1f1e8-1f1fd":[["🇨🇽"],"","",["flag-cx"],32,17,63,0],"1f1e8-1f1fe":[["🇨🇾"],"","",["flag-cy"],32,18,63,0],"1f1e8-1f1ff":[["🇨🇿"],"","",["flag-cz"],32,19,63,0],"1f1e9-1f1ea":[["🇩🇪"],"","󾓨",["flag-de","de"],32,20,63,0],"1f1e9-1f1ec":[["🇩🇬"],"","",["flag-dg"],32,21,61,0],"1f1e9-1f1ef":[["🇩🇯"],"","",["flag-dj"],32,22,63,0],"1f1e9-1f1f0":[["🇩🇰"],"","",["flag-dk"],32,23,63,0],"1f1e9-1f1f2":[["🇩🇲"],"","",["flag-dm"],32,24,63,0],"1f1e9-1f1f4":[["🇩🇴"],"","",["flag-do"],32,25,63,0],"1f1e9-1f1ff":[["🇩🇿"],"","",["flag-dz"],32,26,63,0],"1f1ea-1f1e6":[["🇪🇦"],"","",["flag-ea"],32,27,61,0],"1f1ea-1f1e8":[["🇪🇨"],"","",["flag-ec"],32,28,63,0],"1f1ea-1f1ea":[["🇪🇪"],"","",["flag-ee"],32,29,63,0],"1f1ea-1f1ec":[["🇪🇬"],"","",["flag-eg"],32,30,63,0],"1f1ea-1f1ed":[["🇪🇭"],"","",["flag-eh"],32,31,61,0],"1f1ea-1f1f7":[["🇪🇷"],"","",["flag-er"],32,32,63,0],"1f1ea-1f1f8":[["🇪🇸"],"","󾓫",["flag-es","es"],32,33,63,0],"1f1ea-1f1f9":[["🇪🇹"],"","",["flag-et"],32,34,63,0],"1f1ea-1f1fa":[["🇪🇺"],"","",["flag-eu"],32,35,63,0],"1f1eb-1f1ee":[["🇫🇮"],"","",["flag-fi"],32,36,63,0],"1f1eb-1f1ef":[["🇫🇯"],"","",["flag-fj"],32,37,63,0],"1f1eb-1f1f0":[["🇫🇰"],"","",["flag-fk"],32,38,61,0],"1f1eb-1f1f2":[["🇫🇲"],"","",["flag-fm"],32,39,63,0],"1f1eb-1f1f4":[["🇫🇴"],"","",["flag-fo"],32,40,63,0],"1f1eb-1f1f7":[["🇫🇷"],"","󾓧",["flag-fr","fr"],32,41,63,0],"1f1ec-1f1e6":[["🇬🇦"],"","",["flag-ga"],32,42,63,0],"1f1ec-1f1e7":[["🇬🇧"],"","󾓪",["flag-gb","gb","uk"],32,43,63,0],"1f1ec-1f1e9":[["🇬🇩"],"","",["flag-gd"],32,44,63,0],"1f1ec-1f1ea":[["🇬🇪"],"","",["flag-ge"],32,45,63,0],"1f1ec-1f1eb":[["🇬🇫"],"","",["flag-gf"],32,46,61,0],"1f1ec-1f1ec":[["🇬🇬"],"","",["flag-gg"],32,47,63,0],"1f1ec-1f1ed":[["🇬🇭"],"","",["flag-gh"],32,48,63,0],"1f1ec-1f1ee":[["🇬🇮"],"","",["flag-gi"],33,0,63,0],"1f1ec-1f1f1":[["🇬🇱"],"","",["flag-gl"],33,1,63,0],"1f1ec-1f1f2":[["🇬🇲"],"","",["flag-gm"],33,2,63,0],"1f1ec-1f1f3":[["🇬🇳"],"","",["flag-gn"],33,3,63,0],"1f1ec-1f1f5":[["🇬🇵"],"","",["flag-gp"],33,4,61,0],"1f1ec-1f1f6":[["🇬🇶"],"","",["flag-gq"],33,5,63,0],"1f1ec-1f1f7":[["🇬🇷"],"","",["flag-gr"],33,6,63,0],"1f1ec-1f1f8":[["🇬🇸"],"","",["flag-gs"],33,7,61,0],"1f1ec-1f1f9":[["🇬🇹"],"","",["flag-gt"],33,8,63,0],"1f1ec-1f1fa":[["🇬🇺"],"","",["flag-gu"],33,9,63,0],"1f1ec-1f1fc":[["🇬🇼"],"","",["flag-gw"],33,10,63,0],"1f1ec-1f1fe":[["🇬🇾"],"","",["flag-gy"],33,11,63,0],"1f1ed-1f1f0":[["🇭🇰"],"","",["flag-hk"],33,12,63,0],"1f1ed-1f1f2":[["🇭🇲"],"","",["flag-hm"],33,13,61,0],"1f1ed-1f1f3":[["🇭🇳"],"","",["flag-hn"],33,14,63,0],"1f1ed-1f1f7":[["🇭🇷"],"","",["flag-hr"],33,15,63,0],"1f1ed-1f1f9":[["🇭🇹"],"","",["flag-ht"],33,16,63,0],"1f1ed-1f1fa":[["🇭🇺"],"","",["flag-hu"],33,17,63,0],"1f1ee-1f1e8":[["🇮🇨"],"","",["flag-ic"],33,18,63,0],"1f1ee-1f1e9":[["🇮🇩"],"","",["flag-id"],33,19,63,0],"1f1ee-1f1ea":[["🇮🇪"],"","",["flag-ie"],33,20,63,0],"1f1ee-1f1f1":[["🇮🇱"],"","",["flag-il"],33,21,63,0],"1f1ee-1f1f2":[["🇮🇲"],"","",["flag-im"],33,22,63,0],"1f1ee-1f1f3":[["🇮🇳"],"","",["flag-in"],33,23,63,0],"1f1ee-1f1f4":[["🇮🇴"],"","",["flag-io"],33,24,63,0],"1f1ee-1f1f6":[["🇮🇶"],"","",["flag-iq"],33,25,63,0],"1f1ee-1f1f7":[["🇮🇷"],"","",["flag-ir"],33,26,63,0],"1f1ee-1f1f8":[["🇮🇸"],"","",["flag-is"],33,27,63,0],"1f1ee-1f1f9":[["🇮🇹"],"","󾓩",["flag-it","it"],33,28,63,0],"1f1ef-1f1ea":[["🇯🇪"],"","",["flag-je"],33,29,63,0],"1f1ef-1f1f2":[["🇯🇲"],"","",["flag-jm"],33,30,63,0],"1f1ef-1f1f4":[["🇯🇴"],"","",["flag-jo"],33,31,63,0],"1f1ef-1f1f5":[["🇯🇵"],"","󾓥",["flag-jp","jp"],33,32,63,0],"1f1f0-1f1ea":[["🇰🇪"],"","",["flag-ke"],33,33,63,0],"1f1f0-1f1ec":[["🇰🇬"],"","",["flag-kg"],33,34,63,0],"1f1f0-1f1ed":[["🇰🇭"],"","",["flag-kh"],33,35,63,0],"1f1f0-1f1ee":[["🇰🇮"],"","",["flag-ki"],33,36,63,0],"1f1f0-1f1f2":[["🇰🇲"],"","",["flag-km"],33,37,63,0],"1f1f0-1f1f3":[["🇰🇳"],"","",["flag-kn"],33,38,63,0],"1f1f0-1f1f5":[["🇰🇵"],"","",["flag-kp"],33,39,63,0],"1f1f0-1f1f7":[["🇰🇷"],"","󾓮",["flag-kr","kr"],33,40,63,0],"1f1f0-1f1fc":[["🇰🇼"],"","",["flag-kw"],33,41,63,0],"1f1f0-1f1fe":[["🇰🇾"],"","",["flag-ky"],33,42,63,0],"1f1f0-1f1ff":[["🇰🇿"],"","",["flag-kz"],33,43,63,0],"1f1f1-1f1e6":[["🇱🇦"],"","",["flag-la"],33,44,63,0],"1f1f1-1f1e7":[["🇱🇧"],"","",["flag-lb"],33,45,63,0],"1f1f1-1f1e8":[["🇱🇨"],"","",["flag-lc"],33,46,63,0],"1f1f1-1f1ee":[["🇱🇮"],"","",["flag-li"],33,47,63,0],"1f1f1-1f1f0":[["🇱🇰"],"","",["flag-lk"],33,48,63,0],"1f1f1-1f1f7":[["🇱🇷"],"","",["flag-lr"],34,0,63,0],"1f1f1-1f1f8":[["🇱🇸"],"","",["flag-ls"],34,1,63,0],"1f1f1-1f1f9":[["🇱🇹"],"","",["flag-lt"],34,2,63,0],"1f1f1-1f1fa":[["🇱🇺"],"","",["flag-lu"],34,3,63,0],"1f1f1-1f1fb":[["🇱🇻"],"","",["flag-lv"],34,4,63,0],"1f1f1-1f1fe":[["🇱🇾"],"","",["flag-ly"],34,5,63,0],"1f1f2-1f1e6":[["🇲🇦"],"","",["flag-ma"],34,6,63,0],"1f1f2-1f1e8":[["🇲🇨"],"","",["flag-mc"],34,7,63,0],"1f1f2-1f1e9":[["🇲🇩"],"","",["flag-md"],34,8,63,0],"1f1f2-1f1ea":[["🇲🇪"],"","",["flag-me"],34,9,63,0],"1f1f2-1f1eb":[["🇲🇫"],"","",["flag-mf"],34,10,61,0],"1f1f2-1f1ec":[["🇲🇬"],"","",["flag-mg"],34,11,63,0],"1f1f2-1f1ed":[["🇲🇭"],"","",["flag-mh"],34,12,63,0],"1f1f2-1f1f0":[["🇲🇰"],"","",["flag-mk"],34,13,63,0],"1f1f2-1f1f1":[["🇲🇱"],"","",["flag-ml"],34,14,63,0],"1f1f2-1f1f2":[["🇲🇲"],"","",["flag-mm"],34,15,63,0],"1f1f2-1f1f3":[["🇲🇳"],"","",["flag-mn"],34,16,63,0],"1f1f2-1f1f4":[["🇲🇴"],"","",["flag-mo"],34,17,63,0],"1f1f2-1f1f5":[["🇲🇵"],"","",["flag-mp"],34,18,63,0],"1f1f2-1f1f6":[["🇲🇶"],"","",["flag-mq"],34,19,61,0],"1f1f2-1f1f7":[["🇲🇷"],"","",["flag-mr"],34,20,63,0],"1f1f2-1f1f8":[["🇲🇸"],"","",["flag-ms"],34,21,63,0],"1f1f2-1f1f9":[["🇲🇹"],"","",["flag-mt"],34,22,63,0],"1f1f2-1f1fa":[["🇲🇺"],"","",["flag-mu"],34,23,63,0],"1f1f2-1f1fb":[["🇲🇻"],"","",["flag-mv"],34,24,63,0],"1f1f2-1f1fc":[["🇲🇼"],"","",["flag-mw"],34,25,63,0],"1f1f2-1f1fd":[["🇲🇽"],"","",["flag-mx"],34,26,63,0],"1f1f2-1f1fe":[["🇲🇾"],"","",["flag-my"],34,27,63,0],"1f1f2-1f1ff":[["🇲🇿"],"","",["flag-mz"],34,28,63,0],"1f1f3-1f1e6":[["🇳🇦"],"","",["flag-na"],34,29,63,0],"1f1f3-1f1e8":[["🇳🇨"],"","",["flag-nc"],34,30,61,0],"1f1f3-1f1ea":[["🇳🇪"],"","",["flag-ne"],34,31,63,0],"1f1f3-1f1eb":[["🇳🇫"],"","",["flag-nf"],34,32,63,0],"1f1f3-1f1ec":[["🇳🇬"],"","",["flag-ng"],34,33,63,0],"1f1f3-1f1ee":[["🇳🇮"],"","",["flag-ni"],34,34,63,0],"1f1f3-1f1f1":[["🇳🇱"],"","",["flag-nl"],34,35,63,0],"1f1f3-1f1f4":[["🇳🇴"],"","",["flag-no"],34,36,63,0],"1f1f3-1f1f5":[["🇳🇵"],"","",["flag-np"],34,37,63,0],"1f1f3-1f1f7":[["🇳🇷"],"","",["flag-nr"],34,38,63,0],"1f1f3-1f1fa":[["🇳🇺"],"","",["flag-nu"],34,39,63,0],"1f1f3-1f1ff":[["🇳🇿"],"","",["flag-nz"],34,40,63,0],"1f1f4-1f1f2":[["🇴🇲"],"","",["flag-om"],34,41,63,0],"1f1f5-1f1e6":[["🇵🇦"],"","",["flag-pa"],34,42,63,0],"1f1f5-1f1ea":[["🇵🇪"],"","",["flag-pe"],34,43,63,0],"1f1f5-1f1eb":[["🇵🇫"],"","",["flag-pf"],34,44,63,0],"1f1f5-1f1ec":[["🇵🇬"],"","",["flag-pg"],34,45,63,0],"1f1f5-1f1ed":[["🇵🇭"],"","",["flag-ph"],34,46,63,0],"1f1f5-1f1f0":[["🇵🇰"],"","",["flag-pk"],34,47,63,0],"1f1f5-1f1f1":[["🇵🇱"],"","",["flag-pl"],34,48,63,0],"1f1f5-1f1f2":[["🇵🇲"],"","",["flag-pm"],35,0,61,0],"1f1f5-1f1f3":[["🇵🇳"],"","",["flag-pn"],35,1,63,0],"1f1f5-1f1f7":[["🇵🇷"],"","",["flag-pr"],35,2,63,0],"1f1f5-1f1f8":[["🇵🇸"],"","",["flag-ps"],35,3,63,0],"1f1f5-1f1f9":[["🇵🇹"],"","",["flag-pt"],35,4,63,0],"1f1f5-1f1fc":[["🇵🇼"],"","",["flag-pw"],35,5,63,0],"1f1f5-1f1fe":[["🇵🇾"],"","",["flag-py"],35,6,63,0],"1f1f6-1f1e6":[["🇶🇦"],"","",["flag-qa"],35,7,63,0],"1f1f7-1f1ea":[["🇷🇪"],"","",["flag-re"],35,8,61,0],"1f1f7-1f1f4":[["🇷🇴"],"","",["flag-ro"],35,9,63,0],"1f1f7-1f1f8":[["🇷🇸"],"","",["flag-rs"],35,10,63,0],"1f1f7-1f1fa":[["🇷🇺"],"","󾓬",["flag-ru","ru"],35,11,63,0],"1f1f7-1f1fc":[["🇷🇼"],"","",["flag-rw"],35,12,63,0],"1f1f8-1f1e6":[["🇸🇦"],"","",["flag-sa"],35,13,63,0],"1f1f8-1f1e7":[["🇸🇧"],"","",["flag-sb"],35,14,63,0],"1f1f8-1f1e8":[["🇸🇨"],"","",["flag-sc"],35,15,63,0],"1f1f8-1f1e9":[["🇸🇩"],"","",["flag-sd"],35,16,63,0],"1f1f8-1f1ea":[["🇸🇪"],"","",["flag-se"],35,17,63,0],"1f1f8-1f1ec":[["🇸🇬"],"","",["flag-sg"],35,18,63,0],"1f1f8-1f1ed":[["🇸🇭"],"","",["flag-sh"],35,19,63,0],"1f1f8-1f1ee":[["🇸🇮"],"","",["flag-si"],35,20,63,0],"1f1f8-1f1ef":[["🇸🇯"],"","",["flag-sj"],35,21,61,0],"1f1f8-1f1f0":[["🇸🇰"],"","",["flag-sk"],35,22,63,0],"1f1f8-1f1f1":[["🇸🇱"],"","",["flag-sl"],35,23,63,0],"1f1f8-1f1f2":[["🇸🇲"],"","",["flag-sm"],35,24,63,0],"1f1f8-1f1f3":[["🇸🇳"],"","",["flag-sn"],35,25,63,0],"1f1f8-1f1f4":[["🇸🇴"],"","",["flag-so"],35,26,63,0],"1f1f8-1f1f7":[["🇸🇷"],"","",["flag-sr"],35,27,63,0],"1f1f8-1f1f8":[["🇸🇸"],"","",["flag-ss"],35,28,63,0],"1f1f8-1f1f9":[["🇸🇹"],"","",["flag-st"],35,29,63,0],"1f1f8-1f1fb":[["🇸🇻"],"","",["flag-sv"],35,30,63,0],"1f1f8-1f1fd":[["🇸🇽"],"","",["flag-sx"],35,31,63,0],"1f1f8-1f1fe":[["🇸🇾"],"","",["flag-sy"],35,32,63,0],"1f1f8-1f1ff":[["🇸🇿"],"","",["flag-sz"],35,33,63,0],"1f1f9-1f1e6":[["🇹🇦"],"","",["flag-ta"],35,34,63,0],"1f1f9-1f1e8":[["🇹🇨"],"","",["flag-tc"],35,35,63,0],"1f1f9-1f1e9":[["🇹🇩"],"","",["flag-td"],35,36,63,0],"1f1f9-1f1eb":[["🇹🇫"],"","",["flag-tf"],35,37,61,0],"1f1f9-1f1ec":[["🇹🇬"],"","",["flag-tg"],35,38,63,0],"1f1f9-1f1ed":[["🇹🇭"],"","",["flag-th"],35,39,63,0],"1f1f9-1f1ef":[["🇹🇯"],"","",["flag-tj"],35,40,63,0],"1f1f9-1f1f0":[["🇹🇰"],"","",["flag-tk"],35,41,63,0],"1f1f9-1f1f1":[["🇹🇱"],"","",["flag-tl"],35,42,63,0],"1f1f9-1f1f2":[["🇹🇲"],"","",["flag-tm"],35,43,63,0],"1f1f9-1f1f3":[["🇹🇳"],"","",["flag-tn"],35,44,63,0],"1f1f9-1f1f4":[["🇹🇴"],"","",["flag-to"],35,45,63,0],"1f1f9-1f1f7":[["🇹🇷"],"","",["flag-tr"],35,46,63,0],"1f1f9-1f1f9":[["🇹🇹"],"","",["flag-tt"],35,47,63,0],"1f1f9-1f1fb":[["🇹🇻"],"","",["flag-tv"],35,48,63,0],"1f1f9-1f1fc":[["🇹🇼"],"","",["flag-tw"],36,0,63,0],"1f1f9-1f1ff":[["🇹🇿"],"","",["flag-tz"],36,1,63,0],"1f1fa-1f1e6":[["🇺🇦"],"","",["flag-ua"],36,2,63,0],"1f1fa-1f1ec":[["🇺🇬"],"","",["flag-ug"],36,3,63,0],"1f1fa-1f1f2":[["🇺🇲"],"","",["flag-um"],36,4,61,0],"1f1fa-1f1f3":[["🇺🇳"],"","",["flag-un"],36,5,6,0],"1f1fa-1f1f8":[["🇺🇸"],"","󾓦",["flag-us","us"],36,6,63,0],"1f1fa-1f1fe":[["🇺🇾"],"","",["flag-uy"],36,7,63,0],"1f1fa-1f1ff":[["🇺🇿"],"","",["flag-uz"],36,8,63,0],"1f1fb-1f1e6":[["🇻🇦"],"","",["flag-va"],36,9,63,0],"1f1fb-1f1e8":[["🇻🇨"],"","",["flag-vc"],36,10,63,0],"1f1fb-1f1ea":[["🇻🇪"],"","",["flag-ve"],36,11,63,0],"1f1fb-1f1ec":[["🇻🇬"],"","",["flag-vg"],36,12,63,0],"1f1fb-1f1ee":[["🇻🇮"],"","",["flag-vi"],36,13,63,0],"1f1fb-1f1f3":[["🇻🇳"],"","",["flag-vn"],36,14,63,0],"1f1fb-1f1fa":[["🇻🇺"],"","",["flag-vu"],36,15,63,0],"1f1fc-1f1eb":[["🇼🇫"],"","",["flag-wf"],36,16,61,0],"1f1fc-1f1f8":[["🇼🇸"],"","",["flag-ws"],36,17,63,0],"1f1fd-1f1f0":[["🇽🇰"],"","",["flag-xk"],36,18,61,0],"1f1fe-1f1ea":[["🇾🇪"],"","",["flag-ye"],36,19,63,0],"1f1fe-1f1f9":[["🇾🇹"],"","",["flag-yt"],36,20,61,0],"1f1ff-1f1e6":[["🇿🇦"],"","",["flag-za"],36,21,63,0],"1f1ff-1f1f2":[["🇿🇲"],"","",["flag-zm"],36,22,63,0],"1f1ff-1f1fc":[["🇿🇼"],"","",["flag-zw"],36,23,63,0],"1f468-200d-1f33e":[["👨‍🌾"],"","",["male-farmer"],36,24,23,0],"1f468-200d-1f373":[["👨‍🍳"],"","",["male-cook"],36,30,23,0],"1f468-200d-1f393":[["👨‍🎓"],"","",["male-student"],36,36,23,0],"1f468-200d-1f3a4":[["👨‍🎤"],"","",["male-singer"],36,42,23,0],"1f468-200d-1f3a8":[["👨‍🎨"],"","",["male-artist"],36,48,23,0],"1f468-200d-1f3eb":[["👨‍🏫"],"","",["male-teacher"],37,5,23,0],"1f468-200d-1f3ed":[["👨‍🏭"],"","",["male-factory-worker"],37,11,23,0],"1f468-200d-1f466":[["👨‍👦"],"","",["man-boy"],37,17,23,0],"1f468-200d-1f467":[["👨‍👧"],"","",["man-girl"],37,18,23,0],"1f468-200d-1f4bb":[["👨‍💻"],"","",["male-technologist"],37,19,23,0],"1f468-200d-1f4bc":[["👨‍💼"],"","",["male-office-worker"],37,25,23,0],"1f468-200d-1f527":[["👨‍🔧"],"","",["male-mechanic"],37,31,23,0],
@@ -22947,7 +23361,7 @@ has_img_emojione:!0,name:"TROPICAL DRINK",short_name:"tropical_drink",short_name
 has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"ROBOT FACE",short_name:"robot_face",short_names:["robot_face"],sort_order:78},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"HUGGING FACE",short_name:"hugging_face",short_names:["hugging_face"],sort_order:28},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"SIGN OF THE HORNS",short_name:"the_horns",short_names:["the_horns","sign_of_the_horns"],sort_order:108},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-man-boy",short_names:["man-man-boy"],sort_order:171},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-man-boy-boy",short_names:["man-man-boy-boy"],sort_order:174},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-man-girl",short_names:["man-man-girl"],sort_order:172},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-man-girl-boy",short_names:["man-man-girl-boy"],sort_order:173},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-man-girl-girl",short_names:["man-man-girl-girl"],sort_order:175},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-woman-boy-boy",short_names:["man-woman-boy-boy"],sort_order:164},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-woman-girl",short_names:["man-woman-girl"],sort_order:162},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-woman-girl-boy",short_names:["man-woman-girl-boy"],sort_order:163},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"man-woman-girl-girl",short_names:["man-woman-girl-girl"],sort_order:165},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:null,short_name:"man-heart-man",short_names:["man-heart-man"],sort_order:157},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:null,short_name:"man-kiss-man",short_names:["man-kiss-man"],sort_order:160},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"woman-woman-boy",short_names:["woman-woman-boy"],sort_order:166},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"woman-woman-boy-boy",short_names:["woman-woman-boy-boy"],sort_order:169},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"woman-woman-girl",short_names:["woman-woman-girl"],sort_order:167},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"woman-woman-girl-boy",short_names:["woman-woman-girl-boy"],sort_order:168},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:null,short_name:"woman-woman-girl-girl",short_names:["woman-woman-girl-girl"],sort_order:170},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:null,short_name:"woman-heart-woman",short_names:["woman-heart-woman"],sort_order:156},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:null,short_name:"woman-kiss-woman",short_names:["woman-kiss-woman"],sort_order:159}],Places:[{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ANCHOR",short_name:"anchor",short_names:["anchor"],sort_order:49},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"SHINTO SHRINE",short_name:"shinto_shrine",short_names:["shinto_shrine"],sort_order:115},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CHURCH",short_name:"church",short_names:["church"],sort_order:111},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"MOUNTAIN",short_name:"mountain",short_names:["mountain"],sort_order:66},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FOUNTAIN",short_name:"fountain",short_names:["fountain"],sort_order:64},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"FERRY",short_name:"ferry",short_names:["ferry"],sort_order:44},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SAILBOAT",short_name:"boat",short_names:["boat","sailboat"],sort_order:41},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TENT",short_name:"tent",short_names:["tent"],sort_order:72},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FUEL PUMP",short_name:"fuelpump",short_names:["fuelpump"],sort_order:51},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AIRPLANE",short_name:"airplane",short_names:["airplane"],sort_order:38},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FOGGY",short_name:"foggy",short_names:["foggy"],sort_order:61},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"NIGHT WITH STARS",short_name:"night_with_stars",short_names:["night_with_stars"],sort_order:84},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SUNRISE OVER MOUNTAINS",short_name:"sunrise_over_mountains",short_names:["sunrise_over_mountains"],sort_order:77},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SUNRISE",short_name:"sunrise",short_names:["sunrise"],sort_order:76},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CITYSCAPE AT DUSK",short_name:"city_sunset",short_names:["city_sunset"],sort_order:82},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SUNSET OVER BUILDINGS",short_name:"city_sunrise",short_names:["city_sunrise"],sort_order:81},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RAINBOW",short_name:"rainbow",short_names:["rainbow"],sort_order:90},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BRIDGE AT NIGHT",short_name:"bridge_at_night",short_names:["bridge_at_night"],sort_order:85},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"VOLCANO",short_name:"volcano",short_names:["volcano"],sort_order:69},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MILKY WAY",short_name:"milky_way",short_names:["milky_way"],sort_order:86},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SHOOTING STAR",short_name:"stars",short_names:["stars"],sort_order:87},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FIREWORKS",short_name:"fireworks",short_names:["fireworks"],sort_order:89},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FIREWORK SPARKLER",short_name:"sparkler",short_names:["sparkler"],sort_order:88},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOON VIEWING CEREMONY",short_name:"rice_scene",short_names:["rice_scene"],sort_order:65},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CAROUSEL HORSE",short_name:"carousel_horse",short_names:["carousel_horse"],sort_order:59},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FERRIS WHEEL",short_name:"ferris_wheel",short_names:["ferris_wheel"],sort_order:57},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ROLLER COASTER",short_name:"roller_coaster",short_names:["roller_coaster"],sort_order:58},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CHEQUERED FLAG",short_name:"checkered_flag",short_names:["checkered_flag"],sort_order:55},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RACING MOTORCYCLE",short_name:"racing_motorcycle",short_names:["racing_motorcycle"],sort_order:14},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RACING CAR",short_name:"racing_car",short_names:["racing_car"],sort_order:6},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SNOW CAPPED MOUNTAIN",short_name:"snow_capped_mountain",short_names:["snow_capped_mountain"],sort_order:67},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CAMPING",short_name:"camping",short_names:["camping"],sort_order:71},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BEACH WITH UMBRELLA",short_name:"beach_with_umbrella",short_names:["beach_with_umbrella"],sort_order:79},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BUILDING CONSTRUCTION",short_name:"building_construction",short_names:["building_construction"],sort_order:60},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HOUSE BUILDINGS",short_name:"house_buildings",short_names:["house_buildings"],sort_order:91},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CITYSCAPE",short_name:"cityscape",short_names:["cityscape"],sort_order:83},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"DERELICT HOUSE BUILDING",short_name:"derelict_house_building",short_names:["derelict_house_building"],sort_order:98},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CLASSICAL BUILDING",short_name:"classical_building",short_names:["classical_building"],sort_order:110},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"DESERT",short_name:"desert",short_names:["desert"],sort_order:78},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"DESERT ISLAND",short_name:"desert_island",short_names:["desert_island"],sort_order:80},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"NATIONAL PARK",short_name:"national_park",short_names:["national_park"],sort_order:73},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"STADIUM",short_name:"stadium",short_names:["stadium"],sort_order:94},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HOUSE BUILDING",short_name:"house",short_names:["house"],sort_order:96},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HOUSE WITH GARDEN",short_name:"house_with_garden",short_names:["house_with_garden"],sort_order:97},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"OFFICE BUILDING",short_name:"office",short_names:["office"],sort_order:99},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"JAPANESE POST OFFICE",short_name:"post_office",short_names:["post_office"],sort_order:101},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"EUROPEAN POST OFFICE",short_name:"european_post_office",short_names:["european_post_office"],sort_order:102},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HOSPITAL",short_name:"hospital",short_names:["hospital"],sort_order:103},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BANK",short_name:"bank",short_names:["bank"],sort_order:104},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HOTEL",short_name:"hotel",short_names:["hotel"],sort_order:105},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"LOVE HOTEL",short_name:"love_hotel",short_names:["love_hotel"],sort_order:108},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CONVENIENCE STORE",short_name:"convenience_store",short_names:["convenience_store"],sort_order:106},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SCHOOL",short_name:"school",short_names:["school"],sort_order:107},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"DEPARTMENT STORE",short_name:"department_store",short_names:["department_store"],sort_order:100},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FACTORY",short_name:"factory",short_names:["factory"],sort_order:63},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"JAPANESE CASTLE",short_name:"japanese_castle",short_names:["japanese_castle"],sort_order:93},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"EUROPEAN CASTLE",short_name:"european_castle",short_names:["european_castle"],sort_order:92},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"WEDDING",short_name:"wedding",short_names:["wedding"],sort_order:109},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SEAT",short_name:"seat",short_names:["seat"],sort_order:48},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"KAABA",short_name:"kaaba",short_names:["kaaba"],sort_order:114},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"MOSQUE",short_name:"mosque",short_names:["mosque"],sort_order:112},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"SYNAGOGUE",short_name:"synagogue",short_names:["synagogue"],sort_order:113},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOUNT FUJI",short_name:"mount_fuji",short_names:["mount_fuji"],sort_order:68},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TOKYO TOWER",short_name:"tokyo_tower",short_names:["tokyo_tower"],sort_order:62},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"STATUE OF LIBERTY",short_name:"statue_of_liberty",short_names:["statue_of_liberty"],sort_order:95},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SILHOUETTE OF JAPAN",short_name:"japan",short_names:["japan"],sort_order:70},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ROCKET",short_name:"rocket",short_names:["rocket"],sort_order:46},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HELICOPTER",short_name:"helicopter",short_names:["helicopter"],sort_order:36},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"STEAM LOCOMOTIVE",short_name:"steam_locomotive",short_names:["steam_locomotive"],sort_order:31},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RAILWAY CAR",short_name:"railway_car",short_names:["railway_car"],sort_order:24},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HIGH-SPEED TRAIN",short_name:"bullettrain_side",short_names:["bullettrain_side"],sort_order:27},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HIGH-SPEED TRAIN WITH BULLET NOSE",short_name:"bullettrain_front",short_names:["bullettrain_front"],sort_order:28},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TRAIN",short_name:"train2",short_names:["train2"],sort_order:32},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"METRO",short_name:"metro",short_names:["metro"],sort_order:33},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"LIGHT RAIL",short_name:"light_rail",short_names:["light_rail"],sort_order:29},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"STATION",short_name:"station",short_names:["station"],sort_order:35},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TRAM",short_name:"tram",short_names:["tram"],sort_order:34},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TRAM CAR",short_name:"train",short_names:["train"],sort_order:25},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BUS",short_name:"bus",short_names:["bus"],sort_order:4},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ONCOMING BUS",short_name:"oncoming_bus",short_names:["oncoming_bus"],sort_order:18},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TROLLEYBUS",short_name:"trolleybus",short_names:["trolleybus"],sort_order:5},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BUS STOP",short_name:"busstop",short_names:["busstop"],sort_order:52},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MINIBUS",short_name:"minibus",short_names:["minibus"],sort_order:10},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AMBULANCE",short_name:"ambulance",short_names:["ambulance"],sort_order:8},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FIRE ENGINE",short_name:"fire_engine",short_names:["fire_engine"],sort_order:9},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"POLICE CAR",short_name:"police_car",short_names:["police_car"],sort_order:7},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ONCOMING POLICE CAR",short_name:"oncoming_police_car",short_names:["oncoming_police_car"],sort_order:17},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TAXI",short_name:"taxi",short_names:["taxi"],sort_order:2},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ONCOMING TAXI",short_name:"oncoming_taxi",short_names:["oncoming_taxi"],sort_order:20},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AUTOMOBILE",short_name:"car",short_names:["car","red_car"],sort_order:1},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ONCOMING AUTOMOBILE",short_name:"oncoming_automobile",short_names:["oncoming_automobile"],sort_order:19},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RECREATIONAL VEHICLE",short_name:"blue_car",short_names:["blue_car"],sort_order:3},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"DELIVERY TRUCK",short_name:"truck",short_names:["truck"],sort_order:11},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ARTICULATED LORRY",short_name:"articulated_lorry",short_names:["articulated_lorry"],sort_order:12},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TRACTOR",short_name:"tractor",short_names:["tractor"],sort_order:13},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MONORAIL",short_name:"monorail",short_names:["monorail"],sort_order:26},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOUNTAIN RAILWAY",short_name:"mountain_railway",short_names:["mountain_railway"],sort_order:30},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SUSPENSION RAILWAY",short_name:"suspension_railway",short_names:["suspension_railway"],sort_order:23},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOUNTAIN CABLEWAY",short_name:"mountain_cableway",short_names:["mountain_cableway"],sort_order:22},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AERIAL TRAMWAY",short_name:"aerial_tramway",short_names:["aerial_tramway"],sort_order:21},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SHIP",short_name:"ship",short_names:["ship"],sort_order:56},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SPEEDBOAT",short_name:"speedboat",short_names:["speedboat"],sort_order:43},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HORIZONTAL TRAFFIC LIGHT",short_name:"traffic_light",short_names:["traffic_light"],sort_order:54},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"VERTICAL TRAFFIC LIGHT",short_name:"vertical_traffic_light",short_names:["vertical_traffic_light"],sort_order:53},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CONSTRUCTION SIGN",short_name:"construction",short_names:["construction"],sort_order:50},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"POLICE CARS REVOLVING LIGHT",short_name:"rotating_light",short_names:["rotating_light"],sort_order:16},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BICYCLE",short_name:"bike",short_names:["bike"],sort_order:15},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOTORWAY",short_name:"motorway",short_names:["motorway"],sort_order:74},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RAILWAY TRACK",short_name:"railway_track",short_names:["railway_track"],sort_order:75},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOTOR BOAT",short_name:"motor_boat",short_names:["motor_boat"],sort_order:42},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SMALL AIRPLANE",short_name:"small_airplane",short_names:["small_airplane"],sort_order:37},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AIRPLANE DEPARTURE",short_name:"airplane_departure",short_names:["airplane_departure"],sort_order:39},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AIRPLANE ARRIVING",short_name:"airplane_arriving",short_names:["airplane_arriving"],sort_order:40},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SATELLITE",short_name:"satellite",short_names:["satellite"],sort_order:47},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"PASSENGER SHIP",short_name:"passenger_ship",short_names:["passenger_ship"],sort_order:45}],Activity:[{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SOCCER BALL",short_name:"soccer",short_names:["soccer"],sort_order:1},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BASEBALL",short_name:"baseball",short_names:["baseball"],sort_order:4},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FLAG IN HOLE",short_name:"golf",short_names:["golf"],sort_order:9},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"SKIER",short_name:"skier",short_names:["skier"],sort_order:17},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"ICE SKATE",short_name:"ice_skate",short_names:["ice_skate"],sort_order:19},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"PERSON WITH BALL",short_name:"person_with_ball",short_names:["person_with_ball"],sort_order:26},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MILITARY MEDAL",short_name:"medal",short_names:["medal"],sort_order:35},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REMINDER RIBBON",short_name:"reminder_ribbon",short_names:["reminder_ribbon"],sort_order:36},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ADMISSION TICKETS",short_name:"admission_tickets",short_names:["admission_tickets"],sort_order:39},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"FISHING POLE AND FISH",short_name:"fishing_pole_and_fish",short_names:["fishing_pole_and_fish"],sort_order:21},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MICROPHONE",short_name:"microphone",short_names:["microphone"],sort_order:43},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HEADPHONE",short_name:"headphones",short_names:["headphones"],sort_order:44},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ARTIST PALETTE",short_name:"art",short_names:["art"],sort_order:41},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CIRCUS TENT",short_name:"circus_tent",short_names:["circus_tent"],sort_order:42},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TICKET",short_name:"ticket",short_names:["ticket"],sort_order:38},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"CLAPPER BOARD",short_name:"clapper",short_names:["clapper"],sort_order:51},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"PERFORMING ARTS",short_name:"performing_arts",short_names:["performing_arts"],sort_order:40},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"VIDEO GAME",short_name:"video_game",short_names:["video_game"],sort_order:52},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"DIRECT HIT",short_name:"dart",short_names:["dart"],sort_order:54},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SLOT MACHINE",short_name:"slot_machine",short_names:["slot_machine"],sort_order:56},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BILLIARDS",short_name:"8ball",short_names:["8ball"],sort_order:8},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"GAME DIE",short_name:"game_die",short_names:["game_die"],sort_order:55},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BOWLING",short_name:"bowling",short_names:["bowling"],sort_order:57},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SAXOPHONE",short_name:"saxophone",short_names:["saxophone"],sort_order:47},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"GUITAR",short_name:"guitar",short_names:["guitar"],sort_order:49},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MUSICAL KEYBOARD",short_name:"musical_keyboard",short_names:["musical_keyboard"],sort_order:46},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TRUMPET",short_name:"trumpet",short_names:["trumpet"],sort_order:48},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"VIOLIN",short_name:"violin",short_names:["violin"],sort_order:50},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MUSICAL SCORE",short_name:"musical_score",short_names:["musical_score"],sort_order:45},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RUNNING SHIRT WITH SASH",short_name:"running_shirt_with_sash",short_names:["running_shirt_with_sash"],sort_order:33},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TENNIS RACQUET AND BALL",short_name:"tennis",short_names:["tennis"],sort_order:5},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SKI AND SKI BOOT",short_name:"ski",short_names:["ski"],sort_order:16},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BASKETBALL AND HOOP",short_name:"basketball",short_names:["basketball"],sort_order:2},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SNOWBOARDER",short_name:"snowboarder",short_names:["snowboarder"],sort_order:18},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SURFER",short_name:"surfer",short_names:["surfer"],sort_order:24},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SPORTS MEDAL",short_name:"sports_medal",short_names:["sports_medal"],sort_order:34},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"TROPHY",short_name:"trophy",short_names:["trophy"],sort_order:32},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"HORSE RACING",short_name:"horse_racing",short_names:["horse_racing"],sort_order:30},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"AMERICAN FOOTBALL",short_name:"football",short_names:["football"],sort_order:3},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"RUGBY FOOTBALL",short_name:"rugby_football",short_names:["rugby_football"],sort_order:7},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"SWIMMER",short_name:"swimmer",short_names:["swimmer"],sort_order:23},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"WEIGHT LIFTER",short_name:"weight_lifter",short_names:["weight_lifter"],sort_order:27},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"GOLFER",short_name:"golfer",short_names:["golfer"],sort_order:10},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"CRICKET BAT AND BALL",short_name:"cricket_bat_and_ball",short_names:["cricket_bat_and_ball"],sort_order:15},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"VOLLEYBALL",short_name:"volleyball",short_names:["volleyball"],sort_order:6},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"FIELD HOCKEY STICK AND BALL",short_name:"field_hockey_stick_and_ball",short_names:["field_hockey_stick_and_ball"],sort_order:14},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"ICE HOCKEY STICK AND PUCK",short_name:"ice_hockey_stick_and_puck",short_names:["ice_hockey_stick_and_puck"],sort_order:13},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"TABLE TENNIS PADDLE AND BALL",short_name:"table_tennis_paddle_and_ball",short_names:["table_tennis_paddle_and_ball"],sort_order:11},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ROSETTE",short_name:"rosette",short_names:["rosette"],sort_order:37},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"BADMINTON RACQUET AND SHUTTLECOCK",short_name:"badminton_racquet_and_shuttlecock",short_names:["badminton_racquet_and_shuttlecock"],sort_order:12},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"BOW AND ARROW",short_name:"bow_and_arrow",short_names:["bow_and_arrow"],sort_order:20},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ALIEN MONSTER",short_name:"space_invader",short_names:["space_invader"],sort_order:53},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MAN IN BUSINESS SUIT LEVITATING",short_name:"man_in_business_suit_levitating",short_names:["man_in_business_suit_levitating"],sort_order:31},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"ROWBOAT",short_name:"rowboat",short_names:["rowboat"],sort_order:22},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BICYCLIST",short_name:"bicyclist",short_names:["bicyclist"],sort_order:28},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"MOUNTAIN BICYCLIST",short_name:"mountain_bicyclist",short_names:["mountain_bicyclist"],sort_order:29},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"BATH",short_name:"bath",short_names:["bath"],sort_order:25}],Flags:[{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AD",short_name:"flag-ad",short_names:["flag-ad"],sort_order:6},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AE",short_name:"flag-ae",short_names:["flag-ae"],sort_order:233},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,
 has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AF",short_name:"flag-af",short_names:["flag-af"],sort_order:1},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AG",short_name:"flag-ag",short_names:["flag-ag"],sort_order:10},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AI",short_name:"flag-ai",short_names:["flag-ai"],sort_order:8},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AL",short_name:"flag-al",short_names:["flag-al"],sort_order:3},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AM",short_name:"flag-am",short_names:["flag-am"],sort_order:12},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AO",short_name:"flag-ao",short_names:["flag-ao"],sort_order:7},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS AQ",short_name:"flag-aq",short_names:["flag-aq"],sort_order:9},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AR",short_name:"flag-ar",short_names:["flag-ar"],sort_order:11},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS AS",short_name:"flag-as",short_names:["flag-as"],sort_order:5},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AT",short_name:"flag-at",short_names:["flag-at"],sort_order:15},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AU",short_name:"flag-au",short_names:["flag-au"],sort_order:14},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AW",short_name:"flag-aw",short_names:["flag-aw"],sort_order:13},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS AX",short_name:"flag-ax",short_names:["flag-ax"],sort_order:2},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS AZ",short_name:"flag-az",short_names:["flag-az"],sort_order:16},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BA",short_name:"flag-ba",short_names:["flag-ba"],sort_order:29},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BB",short_name:"flag-bb",short_names:["flag-bb"],sort_order:20},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BD",short_name:"flag-bd",short_names:["flag-bd"],sort_order:19},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BE",short_name:"flag-be",short_names:["flag-be"],sort_order:22},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BF",short_name:"flag-bf",short_names:["flag-bf"],sort_order:36},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BG",short_name:"flag-bg",short_names:["flag-bg"],sort_order:35},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BH",short_name:"flag-bh",short_names:["flag-bh"],sort_order:18},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BI",short_name:"flag-bi",short_names:["flag-bi"],sort_order:37},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BJ",short_name:"flag-bj",short_names:["flag-bj"],sort_order:24},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS BL",short_name:"flag-bl",short_names:["flag-bl"],sort_order:185},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BM",short_name:"flag-bm",short_names:["flag-bm"],sort_order:25},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BN",short_name:"flag-bn",short_names:["flag-bn"],sort_order:34},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BO",short_name:"flag-bo",short_names:["flag-bo"],sort_order:27},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS BQ",short_name:"flag-bq",short_names:["flag-bq"],sort_order:28},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BR",short_name:"flag-br",short_names:["flag-br"],sort_order:31},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BS",short_name:"flag-bs",short_names:["flag-bs"],sort_order:17},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BT",short_name:"flag-bt",short_names:["flag-bt"],sort_order:26},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BW",short_name:"flag-bw",short_names:["flag-bw"],sort_order:30},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BY",short_name:"flag-by",short_names:["flag-by"],sort_order:21},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS BZ",short_name:"flag-bz",short_names:["flag-bz"],sort_order:23},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CA",short_name:"flag-ca",short_names:["flag-ca"],sort_order:41},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS CC",short_name:"flag-cc",short_names:["flag-cc"],sort_order:49},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CD",short_name:"flag-cd",short_names:["flag-cd"],sort_order:53},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CF",short_name:"flag-cf",short_names:["flag-cf"],sort_order:44},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CG",short_name:"flag-cg",short_names:["flag-cg"],sort_order:52},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CH",short_name:"flag-ch",short_names:["flag-ch"],sort_order:215},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CI",short_name:"flag-ci",short_names:["flag-ci"],sort_order:110},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS CK",short_name:"flag-ck",short_names:["flag-ck"],sort_order:54},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CL",short_name:"flag-cl",short_names:["flag-cl"],sort_order:46},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CM",short_name:"flag-cm",short_names:["flag-cm"],sort_order:40},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CN",short_name:"flag-cn",short_names:["flag-cn","cn"],sort_order:47},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CO",short_name:"flag-co",short_names:["flag-co"],sort_order:50},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CR",short_name:"flag-cr",short_names:["flag-cr"],sort_order:55},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CU",short_name:"flag-cu",short_names:["flag-cu"],sort_order:57},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CV",short_name:"flag-cv",short_names:["flag-cv"],sort_order:38},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS CW",short_name:"flag-cw",short_names:["flag-cw"],sort_order:58},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS CX",short_name:"flag-cx",short_names:["flag-cx"],sort_order:48},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CY",short_name:"flag-cy",short_names:["flag-cy"],sort_order:59},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS CZ",short_name:"flag-cz",short_names:["flag-cz"],sort_order:60},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS DE",short_name:"flag-de",short_names:["flag-de","de"],sort_order:84},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS DJ",short_name:"flag-dj",short_names:["flag-dj"],sort_order:62},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS DK",short_name:"flag-dk",short_names:["flag-dk"],sort_order:61},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS DM",short_name:"flag-dm",short_names:["flag-dm"],sort_order:63},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS DO",short_name:"flag-do",short_names:["flag-do"],sort_order:64},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS DZ",short_name:"flag-dz",short_names:["flag-dz"],sort_order:4},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS EC",short_name:"flag-ec",short_names:["flag-ec"],sort_order:65},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS EE",short_name:"flag-ee",short_names:["flag-ee"],sort_order:70},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS EG",short_name:"flag-eg",short_names:["flag-eg"],sort_order:66},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS EH",short_name:"flag-eh",short_names:["flag-eh"],sort_order:244},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ER",short_name:"flag-er",short_names:["flag-er"],sort_order:69},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ES",short_name:"flag-es",short_names:["flag-es","es"],sort_order:209},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ET",short_name:"flag-et",short_names:["flag-et"],sort_order:71},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS EU",short_name:"flag-eu",short_names:["flag-eu"],sort_order:72},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS FI",short_name:"flag-fi",short_names:["flag-fi"],sort_order:76},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS FJ",short_name:"flag-fj",short_names:["flag-fj"],sort_order:75},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS FK",short_name:"flag-fk",short_names:["flag-fk"],sort_order:73},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS FM",short_name:"flag-fm",short_names:["flag-fm"],sort_order:144},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS FO",short_name:"flag-fo",short_names:["flag-fo"],sort_order:74},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS FR",short_name:"flag-fr",short_names:["flag-fr","fr"],sort_order:77},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GA",short_name:"flag-ga",short_names:["flag-ga"],sort_order:81},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GB",short_name:"flag-gb",short_names:["flag-gb","gb","uk"],sort_order:234},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GD",short_name:"flag-gd",short_names:["flag-gd"],sort_order:89},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GE",short_name:"flag-ge",short_names:["flag-ge"],sort_order:83},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS GF",short_name:"flag-gf",short_names:["flag-gf"],sort_order:78},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS GG",short_name:"flag-gg",short_names:["flag-gg"],sort_order:93},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GH",short_name:"flag-gh",short_names:["flag-gh"],sort_order:85},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GI",short_name:"flag-gi",short_names:["flag-gi"],sort_order:86},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GL",short_name:"flag-gl",short_names:["flag-gl"],sort_order:88},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GM",short_name:"flag-gm",short_names:["flag-gm"],sort_order:82},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GN",short_name:"flag-gn",short_names:["flag-gn"],sort_order:94},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS GP",short_name:"flag-gp",short_names:["flag-gp"],sort_order:90},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GQ",short_name:"flag-gq",short_names:["flag-gq"],sort_order:68},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GR",short_name:"flag-gr",short_names:["flag-gr"],sort_order:87},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS GS",short_name:"flag-gs",short_names:["flag-gs"],sort_order:206},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GT",short_name:"flag-gt",short_names:["flag-gt"],sort_order:92},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GU",short_name:"flag-gu",short_names:["flag-gu"],sort_order:91},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GW",short_name:"flag-gw",short_names:["flag-gw"],sort_order:95},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS GY",short_name:"flag-gy",short_names:["flag-gy"],sort_order:96},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS HK",short_name:"flag-hk",short_names:["flag-hk"],sort_order:99},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS HN",short_name:"flag-hn",short_names:["flag-hn"],sort_order:98},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS HR",short_name:"flag-hr",short_names:["flag-hr"],sort_order:56},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS HT",short_name:"flag-ht",short_names:["flag-ht"],sort_order:97},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS HU",short_name:"flag-hu",short_names:["flag-hu"],sort_order:100},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS IC",short_name:"flag-ic",short_names:["flag-ic"],sort_order:42},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ID",short_name:"flag-id",short_names:["flag-id"],sort_order:103},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IE",short_name:"flag-ie",short_names:["flag-ie"],sort_order:106},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IL",short_name:"flag-il",short_names:["flag-il"],sort_order:108},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS IM",short_name:"flag-im",short_names:["flag-im"],sort_order:107},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IN",short_name:"flag-in",short_names:["flag-in"],sort_order:102},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS IO",short_name:"flag-io",short_names:["flag-io"],sort_order:32},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IQ",short_name:"flag-iq",short_names:["flag-iq"],sort_order:105},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IR",short_name:"flag-ir",short_names:["flag-ir"],sort_order:104},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IS",short_name:"flag-is",short_names:["flag-is"],sort_order:101},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS IT",short_name:"flag-it",short_names:["flag-it","it"],sort_order:109},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS JE",short_name:"flag-je",short_names:["flag-je"],sort_order:113},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS JM",short_name:"flag-jm",short_names:["flag-jm"],sort_order:111},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS JO",short_name:"flag-jo",short_names:["flag-jo"],sort_order:114},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS JP",short_name:"flag-jp",short_names:["flag-jp","jp"],sort_order:112},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KE",short_name:"flag-ke",short_names:["flag-ke"],sort_order:116},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KG",short_name:"flag-kg",short_names:["flag-kg"],sort_order:120},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KH",short_name:"flag-kh",short_names:["flag-kh"],sort_order:39},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KI",short_name:"flag-ki",short_names:["flag-ki"],sort_order:117},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KM",short_name:"flag-km",short_names:["flag-km"],sort_order:51},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KN",short_name:"flag-kn",short_names:["flag-kn"],sort_order:187},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KP",short_name:"flag-kp",short_names:["flag-kp"],sort_order:165},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KR",short_name:"flag-kr",short_names:["flag-kr","kr"],sort_order:207},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KW",short_name:"flag-kw",short_names:["flag-kw"],sort_order:119},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KY",short_name:"flag-ky",short_names:["flag-ky"],sort_order:43},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS KZ",short_name:"flag-kz",short_names:["flag-kz"],sort_order:115},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LA",short_name:"flag-la",short_names:["flag-la"],sort_order:121},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LB",short_name:"flag-lb",short_names:["flag-lb"],sort_order:123},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LC",short_name:"flag-lc",short_names:["flag-lc"],sort_order:188},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LI",short_name:"flag-li",short_names:["flag-li"],sort_order:127},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LK",short_name:"flag-lk",short_names:["flag-lk"],sort_order:210},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LR",short_name:"flag-lr",short_names:["flag-lr"],sort_order:125},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LS",short_name:"flag-ls",short_names:["flag-ls"],sort_order:124},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LT",short_name:"flag-lt",short_names:["flag-lt"],sort_order:128},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LU",short_name:"flag-lu",short_names:["flag-lu"],sort_order:129},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LV",short_name:"flag-lv",short_names:["flag-lv"],sort_order:122},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS LY",short_name:"flag-ly",short_names:["flag-ly"],sort_order:126},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MA",short_name:"flag-ma",short_names:["flag-ma"],sort_order:150},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MC",short_name:"flag-mc",short_names:["flag-mc"],sort_order:146},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MD",short_name:"flag-md",short_names:["flag-md"],sort_order:145},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ME",short_name:"flag-me",short_names:["flag-me"],sort_order:148},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MG",short_name:"flag-mg",short_names:["flag-mg"],sort_order:132},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MH",short_name:"flag-mh",short_names:["flag-mh"],sort_order:138},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MK",short_name:"flag-mk",short_names:["flag-mk"],sort_order:131},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ML",short_name:"flag-ml",short_names:["flag-ml"],sort_order:136},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MM",short_name:"flag-mm",short_names:["flag-mm"],sort_order:152},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MN",short_name:"flag-mn",short_names:["flag-mn"],sort_order:147},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MO",short_name:"flag-mo",short_names:["flag-mo"],sort_order:130},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS MP",short_name:"flag-mp",short_names:["flag-mp"],sort_order:164},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS MQ",short_name:"flag-mq",short_names:["flag-mq"],sort_order:139},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MR",short_name:"flag-mr",short_names:["flag-mr"],sort_order:140},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MS",short_name:"flag-ms",short_names:["flag-ms"],sort_order:149},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MT",short_name:"flag-mt",short_names:["flag-mt"],sort_order:137},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MU",short_name:"flag-mu",short_names:["flag-mu"],sort_order:141},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MV",short_name:"flag-mv",short_names:["flag-mv"],sort_order:135},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MW",short_name:"flag-mw",short_names:["flag-mw"],sort_order:133},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MX",short_name:"flag-mx",short_names:["flag-mx"],sort_order:143},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MY",short_name:"flag-my",short_names:["flag-my"],sort_order:134},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS MZ",short_name:"flag-mz",short_names:["flag-mz"],sort_order:151},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NA",short_name:"flag-na",short_names:["flag-na"],sort_order:153},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NC",short_name:"flag-nc",short_names:["flag-nc"],sort_order:157},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NE",short_name:"flag-ne",short_names:["flag-ne"],sort_order:160},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS NF",short_name:"flag-nf",short_names:["flag-nf"],sort_order:163},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NG",short_name:"flag-ng",short_names:["flag-ng"],sort_order:161},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NI",short_name:"flag-ni",short_names:["flag-ni"],sort_order:159},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NL",short_name:"flag-nl",short_names:["flag-nl"],sort_order:156},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NO",short_name:"flag-no",short_names:["flag-no"],sort_order:166},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NP",short_name:"flag-np",short_names:["flag-np"],sort_order:155},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NR",short_name:"flag-nr",short_names:["flag-nr"],sort_order:154},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NU",short_name:"flag-nu",short_names:["flag-nu"],sort_order:162},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS NZ",short_name:"flag-nz",short_names:["flag-nz"],sort_order:158},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS OM",short_name:"flag-om",short_names:["flag-om"],sort_order:167},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PA",short_name:"flag-pa",short_names:["flag-pa"],sort_order:171},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PE",short_name:"flag-pe",short_names:["flag-pe"],sort_order:174},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PF",short_name:"flag-pf",short_names:["flag-pf"],sort_order:79},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PG",short_name:"flag-pg",short_names:["flag-pg"],sort_order:172},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PH",short_name:"flag-ph",short_names:["flag-ph"],sort_order:175},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PK",short_name:"flag-pk",short_names:["flag-pk"],sort_order:168},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PL",short_name:"flag-pl",short_names:["flag-pl"],sort_order:177},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS PM",short_name:"flag-pm",short_names:["flag-pm"],sort_order:189},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS PN",short_name:"flag-pn",short_names:["flag-pn"],sort_order:176},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,
 name:"REGIONAL INDICATOR SYMBOL LETTERS PR",short_name:"flag-pr",short_names:["flag-pr"],sort_order:179},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PS",short_name:"flag-ps",short_names:["flag-ps"],sort_order:170},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PT",short_name:"flag-pt",short_names:["flag-pt"],sort_order:178},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PW",short_name:"flag-pw",short_names:["flag-pw"],sort_order:169},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS PY",short_name:"flag-py",short_names:["flag-py"],sort_order:173},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS QA",short_name:"flag-qa",short_names:["flag-qa"],sort_order:180},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS RE",short_name:"flag-re",short_names:["flag-re"],sort_order:181},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS RO",short_name:"flag-ro",short_names:["flag-ro"],sort_order:182},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS RS",short_name:"flag-rs",short_names:["flag-rs"],sort_order:196},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS RU",short_name:"flag-ru",short_names:["flag-ru","ru"],sort_order:183},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS RW",short_name:"flag-rw",short_names:["flag-rw"],sort_order:184},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SA",short_name:"flag-sa",short_names:["flag-sa"],sort_order:194},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SB",short_name:"flag-sb",short_names:["flag-sb"],sort_order:203},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SC",short_name:"flag-sc",short_names:["flag-sc"],sort_order:197},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SD",short_name:"flag-sd",short_names:["flag-sd"],sort_order:211},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SE",short_name:"flag-se",short_names:["flag-se"],sort_order:214},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SG",short_name:"flag-sg",short_names:["flag-sg"],sort_order:199},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SH",short_name:"flag-sh",short_names:["flag-sh"],sort_order:186},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SI",short_name:"flag-si",short_names:["flag-si"],sort_order:202},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SK",short_name:"flag-sk",short_names:["flag-sk"],sort_order:201},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SL",short_name:"flag-sl",short_names:["flag-sl"],sort_order:198},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SM",short_name:"flag-sm",short_names:["flag-sm"],sort_order:192},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SN",short_name:"flag-sn",short_names:["flag-sn"],sort_order:195},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SO",short_name:"flag-so",short_names:["flag-so"],sort_order:204},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SR",short_name:"flag-sr",short_names:["flag-sr"],sort_order:212},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS SS",short_name:"flag-ss",short_names:["flag-ss"],sort_order:208},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ST",short_name:"flag-st",short_names:["flag-st"],sort_order:193},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SV",short_name:"flag-sv",short_names:["flag-sv"],sort_order:67},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS SX",short_name:"flag-sx",short_names:["flag-sx"],sort_order:200},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SY",short_name:"flag-sy",short_names:["flag-sy"],sort_order:216},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS SZ",short_name:"flag-sz",short_names:["flag-sz"],sort_order:213},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS TC",short_name:"flag-tc",short_names:["flag-tc"],sort_order:229},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TD",short_name:"flag-td",short_names:["flag-td"],sort_order:45},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS TF",short_name:"flag-tf",short_names:["flag-tf"],sort_order:80},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TG",short_name:"flag-tg",short_names:["flag-tg"],sort_order:222},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TH",short_name:"flag-th",short_names:["flag-th"],sort_order:220},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TJ",short_name:"flag-tj",short_names:["flag-tj"],sort_order:218},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS TK",short_name:"flag-tk",short_names:["flag-tk"],sort_order:223},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TL",short_name:"flag-tl",short_names:["flag-tl"],sort_order:221},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TM",short_name:"flag-tm",short_names:["flag-tm"],sort_order:228},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TN",short_name:"flag-tn",short_names:["flag-tn"],sort_order:226},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TO",short_name:"flag-to",short_names:["flag-to"],sort_order:224},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TR",short_name:"flag-tr",short_names:["flag-tr"],sort_order:227},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TT",short_name:"flag-tt",short_names:["flag-tt"],sort_order:225},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TV",short_name:"flag-tv",short_names:["flag-tv"],sort_order:230},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TW",short_name:"flag-tw",short_names:["flag-tw"],sort_order:217},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS TZ",short_name:"flag-tz",short_names:["flag-tz"],sort_order:219},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS UA",short_name:"flag-ua",short_names:["flag-ua"],sort_order:232},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS UG",short_name:"flag-ug",short_names:["flag-ug"],sort_order:231},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS US",short_name:"flag-us",short_names:["flag-us","us"],sort_order:235},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS UY",short_name:"flag-uy",short_names:["flag-uy"],sort_order:237},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS UZ",short_name:"flag-uz",short_names:["flag-uz"],sort_order:238},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS VA",short_name:"flag-va",short_names:["flag-va"],sort_order:240},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS VC",short_name:"flag-vc",short_names:["flag-vc"],sort_order:190},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS VE",short_name:"flag-ve",short_names:["flag-ve"],sort_order:241},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS VG",short_name:"flag-vg",short_names:["flag-vg"],sort_order:33},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS VI",short_name:"flag-vi",short_names:["flag-vi"],sort_order:236},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS VN",short_name:"flag-vn",short_names:["flag-vn"],sort_order:242},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS VU",short_name:"flag-vu",short_names:["flag-vu"],sort_order:239},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS WF",short_name:"flag-wf",short_names:["flag-wf"],sort_order:243},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS WS",short_name:"flag-ws",short_names:["flag-ws"],sort_order:191},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS XK",short_name:"flag-xk",short_names:["flag-xk"],sort_order:118},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS YE",short_name:"flag-ye",short_names:["flag-ye"],sort_order:245},{has_img_apple:!0,has_img_google:!1,has_img_twitter:!0,has_img_emojione:!1,name:"REGIONAL INDICATOR SYMBOL LETTERS YT",short_name:"flag-yt",short_names:["flag-yt"],sort_order:142},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ZA",short_name:"flag-za",short_names:["flag-za"],sort_order:205},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ZM",short_name:"flag-zm",short_names:["flag-zm"],sort_order:246},{has_img_apple:!0,has_img_google:!0,has_img_twitter:!0,has_img_emojione:!0,name:"REGIONAL INDICATOR SYMBOL LETTERS ZW",short_name:"flag-zw",short_names:["flag-zw"],sort_order:247}]}},function(e,_,a){var o=a(10);e.exports=function(){var e=new o.Template({code:function(e,_,a){var o=this;return o.b(a=a||""),o.b('<div id="emoji-picker"><div class="emoji-section emoji-header">'),o.s(o.f("categories",e,_,1),e,_,0,78,145,"{{ }}")&&(o.rs(e,_,function(e,_,a){a.b('<div class="select-category" data-name="'),a.b(a.v(a.f("title",e,_,0))),a.b('">'),a.b(a.t(a.f("icon",e,_,0))),a.b("</div>")}),e.pop()),o.b('</div><div class="emoji-section emoji-search"><div class="search-wrapper"><div class="search-section centered">'),o.b(o.t(o.f("search_icon",e,_,0))),o.b('</div><div class="search-section input"><input class="search-emojis" placeholder="Search"></div></div></div><div class="emoji-title-overlay"><span id="active-title"></span></div><div class="emoji-section emoji-content"></div><div class="emoji-section emoji-footer"><div class="default-content"><span>'),o.b(o.v(o.f("default_content",e,_,0))),o.b('</span></div><div class="emoji-preview"><div class="preview-section" id="emoji-large-preview"></div><div class="preview-section"><span id="emoji-name"></span> <span id="colon-display"></span></div></div></div></div>'),o.fl()},partials:{},subs:{}},'<div id="emoji-picker"><div class="emoji-section emoji-header">{{#categories}}<div class="select-category" data-name="{{title}}">{{{icon}}}</div>{{/categories}}</div><div class="emoji-section emoji-search"><div class="search-wrapper"><div class="search-section centered">{{{search_icon}}}</div><div class="search-section input"><input class="search-emojis" placeholder="Search"></div></div></div><div class="emoji-title-overlay"><span id="active-title"></span></div><div class="emoji-section emoji-content"></div><div class="emoji-section emoji-footer"><div class="default-content"><span>{{default_content}}</span></div><div class="emoji-preview"><div class="preview-section" id="emoji-large-preview"></div><div class="preview-section"><span id="emoji-name"></span> <span id="colon-display"></span></div></div></div></div>',o);return e.render.apply(e,arguments)}},function(e,_,a){var o=a(10);e.exports=function(){var e=new o.Template({code:function(e,_,a){var o=this;return o.b(a=a||""),o.b('<div class="icon-tooltip"><span>'),o.b(o.v(o.f("text",e,_,0))),o.b("</span></div>"),o.fl()},partials:{},subs:{}},'<div class="icon-tooltip"><span>{{text}}</span></div>',o);return e.render.apply(e,arguments)}}])});
-},{"jquery":72}],95:[function(require,module,exports){
+},{"jquery":74}],98:[function(require,module,exports){
 /* eslint-disable node/no-deprecated-api */
 var buffer = require('buffer')
 var Buffer = buffer.Buffer
@@ -23011,7 +23425,7 @@ SafeBuffer.allocUnsafeSlow = function (size) {
   return buffer.SlowBuffer(size)
 }
 
-},{"buffer":10}],96:[function(require,module,exports){
+},{"buffer":10}],99:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -23140,10 +23554,34 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":47,"inherits":65,"readable-stream/duplex.js":81,"readable-stream/passthrough.js":90,"readable-stream/readable.js":91,"readable-stream/transform.js":92,"readable-stream/writable.js":93}],97:[function(require,module,exports){
+},{"events":48,"inherits":67,"readable-stream/duplex.js":84,"readable-stream/passthrough.js":93,"readable-stream/readable.js":94,"readable-stream/transform.js":95,"readable-stream/writable.js":96}],100:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 'use strict';
 
+/*<replacement>*/
+
 var Buffer = require('safe-buffer').Buffer;
+/*</replacement>*/
 
 var isEncoding = Buffer.isEncoding || function (encoding) {
   encoding = '' + encoding;
@@ -23255,10 +23693,10 @@ StringDecoder.prototype.fillLast = function (buf) {
 };
 
 // Checks the type of a UTF-8 byte, whether it's ASCII, a leading byte, or a
-// continuation byte.
+// continuation byte. If an invalid byte is detected, -2 is returned.
 function utf8CheckByte(byte) {
   if (byte <= 0x7F) return 0;else if (byte >> 5 === 0x06) return 2;else if (byte >> 4 === 0x0E) return 3;else if (byte >> 3 === 0x1E) return 4;
-  return -1;
+  return byte >> 6 === 0x02 ? -1 : -2;
 }
 
 // Checks at most 3 bytes at the end of a Buffer in order to detect an
@@ -23272,13 +23710,13 @@ function utf8CheckIncomplete(self, buf, i) {
     if (nb > 0) self.lastNeed = nb - 1;
     return nb;
   }
-  if (--j < i) return 0;
+  if (--j < i || nb === -2) return 0;
   nb = utf8CheckByte(buf[j]);
   if (nb >= 0) {
     if (nb > 0) self.lastNeed = nb - 2;
     return nb;
   }
-  if (--j < i) return 0;
+  if (--j < i || nb === -2) return 0;
   nb = utf8CheckByte(buf[j]);
   if (nb >= 0) {
     if (nb > 0) {
@@ -23292,7 +23730,7 @@ function utf8CheckIncomplete(self, buf, i) {
 // Validates as many continuation bytes for a multi-byte UTF-8 character as
 // needed or are available. If we see a non-continuation byte where we expect
 // one, we "replace" the validated continuation bytes we've seen so far with
-// UTF-8 replacement characters ('\ufffd'), to match v8's UTF-8 decoding
+// a single UTF-8 replacement character ('\ufffd'), to match v8's UTF-8 decoding
 // behavior. The continuation byte check is included three times in the case
 // where all of the continuation bytes for a character exist in the same buffer.
 // It is also done this way as a slight performance increase instead of using a
@@ -23300,17 +23738,17 @@ function utf8CheckIncomplete(self, buf, i) {
 function utf8CheckExtraBytes(self, buf, p) {
   if ((buf[0] & 0xC0) !== 0x80) {
     self.lastNeed = 0;
-    return '\ufffd'.repeat(p);
+    return '\ufffd';
   }
   if (self.lastNeed > 1 && buf.length > 1) {
     if ((buf[1] & 0xC0) !== 0x80) {
       self.lastNeed = 1;
-      return '\ufffd'.repeat(p + 1);
+      return '\ufffd';
     }
     if (self.lastNeed > 2 && buf.length > 2) {
       if ((buf[2] & 0xC0) !== 0x80) {
         self.lastNeed = 2;
-        return '\ufffd'.repeat(p + 2);
+        return '\ufffd';
       }
     }
   }
@@ -23341,11 +23779,11 @@ function utf8Text(buf, i) {
   return buf.toString('utf8', i, end);
 }
 
-// For UTF-8, a replacement character for each buffered byte of a (partial)
-// character needs to be added to the output.
+// For UTF-8, a replacement character is added when ending on a partial
+// character.
 function utf8End(buf) {
   var r = buf && buf.length ? this.write(buf) : '';
-  if (this.lastNeed) return r + '\ufffd'.repeat(this.lastTotal - this.lastNeed);
+  if (this.lastNeed) return r + '\ufffd';
   return r;
 }
 
@@ -23413,7 +23851,7 @@ function simpleWrite(buf) {
 function simpleEnd(buf) {
   return buf && buf.length ? this.write(buf) : '';
 }
-},{"safe-buffer":95}],98:[function(require,module,exports){
+},{"safe-buffer":98}],101:[function(require,module,exports){
 'use strict';
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -23925,7 +24363,7 @@ module.exports = function () {
 }();
 
 
-},{"htmlparser2":63}],99:[function(require,module,exports){
+},{"htmlparser2":64}],102:[function(require,module,exports){
 (function (global){
 
 /**
@@ -23996,7 +24434,7 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],100:[function(require,module,exports){
+},{}],103:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -24059,15 +24497,7 @@ var LiteEditorEmojiPicker = function () {
   _createClass(LiteEditorEmojiPicker, [{
     key: 'onInit',
     value: function onInit(editor, target) {
-      this.editor = editor;
-      this.target = target;
-    }
-  }, {
-    key: 'onClick',
-    value: function onClick() {
-      var editor = this.editor,
-          target = this.target,
-          default_footer_message = this.default_footer_message,
+      var default_footer_message = this.default_footer_message,
           categories = this.categories;
 
       var container = document.querySelector('[data-id="' + editor.id + '"]');
@@ -24085,16 +24515,6 @@ var LiteEditorEmojiPicker = function () {
         categories: categories
       });
       picker.listenOn(target, container, editable);
-      editor.focus();
-      if (typeof requestAnimationFrame !== 'undefined') {
-        requestAnimationFrame(function () {
-          target.click();
-        });
-      } else {
-        setTimeout(function () {
-          target.click();
-        }, 100);
-      }
     }
   }, {
     key: 'onRender',
@@ -24113,7 +24533,7 @@ var LiteEditorEmojiPicker = function () {
 exports.default = LiteEditorEmojiPicker;
 module.exports = exports['default'];
 
-},{"rm-emoji-picker":94}],101:[function(require,module,exports){
+},{"rm-emoji-picker":97}],104:[function(require,module,exports){
 'use strict';
 
 var _liteEditor = require('lite-editor');
@@ -24131,4 +24551,4 @@ editor.registerButton(new _src2.default({
   default_footer_message: '上から絵文字を選択してください'
 }));
 
-},{"../src":100,"lite-editor":74}]},{},[101]);
+},{"../src":103,"lite-editor":76}]},{},[104]);

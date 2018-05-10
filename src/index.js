@@ -45,14 +45,22 @@ export default class LiteEditorEmojiPicker {
   }
 
   onInit(editor, target) {
-    const { default_footer_message, categories } = this;
     const container = document.querySelector(`[data-id="${editor.id}"]`);
     const editable = container.querySelector('[data-selector="lite-editor"]');
     container.style.position = 'relative';
+    this.editable = editable;
+    this.editor = editor;
+    this.container = container;
+    this.target = target;
+  }
+
+  onClick() {
+    const { default_footer_message, categories, container, editable, target, editor } = this;
     if (this.firstClicked) {
       return;
     }
     this.firstClicked = true;
+    editor.saveSelection();
     const picker = new EmojiPicker({
       callback: () => {
         editor.onInput();
@@ -61,6 +69,10 @@ export default class LiteEditorEmojiPicker {
       categories
     });
     picker.listenOn(target, container, editable);
+    editor.restoreSelection();
+    picker.editor.selectLastNode();
+    picker.picker_open = true;
+    picker.openPicker(editor.e);
   }
 
   onRender(editor, target) {

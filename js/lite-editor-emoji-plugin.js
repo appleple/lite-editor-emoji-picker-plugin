@@ -5,7 +5,7 @@
  * lite-editor-emoji-picker-plugin:
  *   license: MIT (http://opensource.org/licenses/MIT)
  *   author: steelydylan
- *   version: 3.0.0
+ *   version: 3.0.1
  *
  * jquery:
  *   license: MIT (http://opensource.org/licenses/MIT)
@@ -10466,16 +10466,29 @@ var LiteEditorEmojiPicker = function () {
   _createClass(LiteEditorEmojiPicker, [{
     key: 'onInit',
     value: function onInit(editor, target) {
-      var default_footer_message = this.default_footer_message,
-          categories = this.categories;
-
       var container = document.querySelector('[data-id="' + editor.id + '"]');
       var editable = container.querySelector('[data-selector="lite-editor"]');
       container.style.position = 'relative';
+      this.editable = editable;
+      this.editor = editor;
+      this.container = container;
+      this.target = target;
+    }
+  }, {
+    key: 'onClick',
+    value: function onClick() {
+      var default_footer_message = this.default_footer_message,
+          categories = this.categories,
+          container = this.container,
+          editable = this.editable,
+          target = this.target,
+          editor = this.editor;
+
       if (this.firstClicked) {
         return;
       }
       this.firstClicked = true;
+      editor.saveSelection();
       var picker = new _rmEmojiPicker2.default({
         callback: function callback() {
           editor.onInput();
@@ -10484,6 +10497,10 @@ var LiteEditorEmojiPicker = function () {
         categories: categories
       });
       picker.listenOn(target, container, editable);
+      editor.restoreSelection();
+      picker.editor.selectLastNode();
+      picker.picker_open = true;
+      picker.openPicker(editor.e);
     }
   }, {
     key: 'onRender',

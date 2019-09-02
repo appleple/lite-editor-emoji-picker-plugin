@@ -31,14 +31,23 @@ const defaultCategories = [
   }
 ];
 
+const defaultSheets = {
+  apple: '/sheets/sheet_apple_64_indexed_128.png',
+  google: '/sheets/sheet_google_64_indexed_128.png',
+  twitter: '/sheets/sheet_twitter_64_indexed_128.png',
+  emojione: '/sheets/sheet_emojione_64_indexed_128.png'
+};
+
 export default class LiteEditorEmojiPicker {
   constructor({
     label = '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>', group, categories = defaultCategories,
-    default_footer_message = 'Please select an emoji from the list above'
+    default_footer_message = 'Please select an emoji from the list above',
+    sheets = defaultSheets
   }) {
     this.label = label;
     this.group = group;
     this.categories = categories;
+    this.sheets = sheets;
     this.default_footer_message = default_footer_message;
     this.action = 'extra';
     this.firstClicked = false;
@@ -55,7 +64,9 @@ export default class LiteEditorEmojiPicker {
   }
 
   onClick() {
-    const { default_footer_message, categories, container, editable, target, editor } = this;
+    const {
+      default_footer_message, categories, container, editable, target, editor, sheets
+    } = this;
     if (this.firstClicked) {
       return;
     }
@@ -66,7 +77,8 @@ export default class LiteEditorEmojiPicker {
         editor.onInput();
       },
       default_footer_message,
-      categories
+      categories,
+      sheets
     });
     picker.listenOn(target, container, editable);
     editor.restoreSelection();

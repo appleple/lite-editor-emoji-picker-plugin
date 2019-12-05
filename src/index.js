@@ -1,4 +1,4 @@
-import EmojiPicker from 'rm-emoji-picker';
+import EmojiPicker from '@appleple/rm-emoji-picker';
 
 const defaultCategories = [
   {

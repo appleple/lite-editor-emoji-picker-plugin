@@ -27,7 +27,7 @@
   "author": "steelydylan",
   "license": "MIT",
   "dependencies": {
-    "@appleple/rm-emoji-picker": "0.0.2",
+    "@appleple/rm-emoji-picker": "0.0.3",
     "jquery": "^3.3.1",
     "lite-editor": "^1.6.28",
     "rm-emoji-picker": "^0.3.31"

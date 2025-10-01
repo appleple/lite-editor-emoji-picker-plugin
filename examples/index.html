@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link rel="stylesheet" href="https://unpkg.com/lite-editor@2.0.0/css/lite-editor.css" />
+    <link rel="stylesheet" href="../css/lite-editor-emoji-picker.css" />
+    <script src="https://unpkg.com/lite-editor@2.0.0/js/lite-editor.iife.js"></script>
+    <title>Document</title>
+  </head>
+  <body>
+    <textarea class="js-editor">testtest</textarea>
+  </body>
+  <script type="module">
+    import LiteEditorEmojiPicker from '/src/index.js';
+
+    const editor = new LiteEditor('.js-editor');
+    editor.registerButton(
+      new LiteEditorEmojiPicker({
+        default_footer_message: '上から絵文字を選択してください',
+        sheets: {
+          apple:
+            'https://github.com/RobertMenke/rm-emoji-picker/blob/master/sheets/sheet_apple_64_indexed_128.png?raw=true',
+        },
+      })
+    );
+  </script>
+</html>

@@ -1,48 +1,51 @@
-import EmojiPicker from '@appleple/rm-emoji-picker';
+import EmojiPicker from 'rm-emoji-picker';
+import './scss/lite-editor-emoji-picker.scss';
 
 const defaultCategories = [
   {
     title: 'People',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-people" aria-hidden="true"></i>'
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-people" aria-hidden="true"></i>',
   },
   {
     title: 'Nature',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-nature" aria-hidden="true"></i>'
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-nature" aria-hidden="true"></i>',
   },
   {
     title: 'Foods',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-food" aria-hidden="true"></i>'
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-food" aria-hidden="true"></i>',
   },
   {
     title: 'Activity',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-activity" aria-hidden="true"></i>'
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-activity" aria-hidden="true"></i>',
   },
   {
     title: 'Places',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-place" aria-hidden="true"></i>'
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-place" aria-hidden="true"></i>',
   },
   {
     title: 'Symbols',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-symbol" aria-hidden="true"></i>'
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-symbol" aria-hidden="true"></i>',
   },
   {
     title: 'Flags',
-    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-flag" aria-hidden="true"></i>'
-  }
+    icon: '<i class="lite-editor-emoji-font lite-editor-emoji-font-flag" aria-hidden="true"></i>',
+  },
 ];
 
 const defaultSheets = {
   apple: '/sheets/sheet_apple_64_indexed_128.png',
   google: '/sheets/sheet_google_64_indexed_128.png',
   twitter: '/sheets/sheet_twitter_64_indexed_128.png',
-  emojione: '/sheets/sheet_emojione_64_indexed_128.png'
+  emojione: '/sheets/sheet_emojione_64_indexed_128.png',
 };
 
 export default class LiteEditorEmojiPicker {
   constructor({
-    label = '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>', group, categories = defaultCategories,
+    label = '<i class="lite-editor-emoji-font lite-editor-emoji-font-smile"></i>',
+    group,
+    categories = defaultCategories,
     default_footer_message = 'Please select an emoji from the list above',
-    sheets = defaultSheets
+    sheets = defaultSheets,
   }) {
     this.label = label;
     this.group = group;
@@ -64,9 +67,7 @@ export default class LiteEditorEmojiPicker {
   }
 
   onClick() {
-    const {
-      default_footer_message, categories, container, editable, target, editor, sheets
-    } = this;
+    const { default_footer_message, categories, container, editable, target, editor, sheets } = this;
     if (this.firstClicked) {
       return;
     }
@@ -78,7 +79,7 @@ export default class LiteEditorEmojiPicker {
       },
       default_footer_message,
       categories,
-      sheets
+      sheets,
     });
     picker.listenOn(target, container, editable);
     editor.restoreSelection();

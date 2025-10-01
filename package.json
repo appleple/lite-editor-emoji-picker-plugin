@@ -2,24 +2,13 @@
   "name": "lite-editor-emoji-picker-plugin",
   "version": "3.1.2",
   "description": "lite-editor plugin for emojis",
-  "main": "lib/index.js",
+  "main": "./js/lite-editor-emoji-plugin.es.js",
+  "module": "./js/lite-editor-emoji-plugin.es.js",
   "scripts": {
-    "test": "npm run lint",
-    "lint": "eslint ./src/index.js --fix",
-    "build:js": "npm-run-all -p build:lib build:global build:test",
-    "build:lib": "npm run babel",
-    "build:test": "browserify ./test/index.js -t babelify -o ./test/bundle.js",
-    "build:global": "browserify ./src/index.js -t babelify -p licensify --standalone liteEditorEmojiPlugin -o ./js/lite-editor-emoji-plugin.js && npm run build:global:min",
-    "build:global:min": "uglifyjs ./js/lite-editor-emoji-plugin.js -m -c --comments -o ./js/lite-editor-emoji-plugin.min.js",
-    "build:sass": "npm-run-all -p sass sass:min",
-    "babel": "babel src --out-dir lib",
-    "sass": "node-sass ./scss/lite-editor-emoji-picker.scss ./css/lite-editor-emoji-picker.css --output-style expanded --include-path ./node_modules",
-    "sass:min": "node-sass ./scss/lite-editor-emoji-picker.scss ./css/lite-editor-emoji-picker.min.css --output-style compressed",
-    "watch:js": "onchange \"src/\" -- npm run build:js",
-    "sync": "browser-sync start --server './' --files './js/*.js' './css/*.css' --startPath '/test/index.html'",
-    "watch:sass": "onchange \"scss\" -- npm run build:sass",
-    "start": "npm-run-all -p watch:js sync",
-    "deploy": "np --no-cleanup"
+    "test": "vitest",
+    "dev": "vite",
+    "build": "vite build && vite build --mode minify && npm run move-css",
+    "move-css": "mkdir -p css && mv js/lite-editor-emoji-picker-plugin.css css/lite-editor-emoji-picker.css"
   },
   "keywords": [
     "lite-editor"
@@ -27,36 +16,13 @@
   "author": "steelydylan",
   "license": "MIT",
   "dependencies": {
-    "@appleple/rm-emoji-picker": "0.0.3",
-    "jquery": "^3.3.1",
-    "lite-editor": "^1.6.28",
-    "rm-emoji-picker": "^0.3.31"
+    "jquery": "^3.7.1",
+    "lite-editor": "^2.0.0",
+    "rm-emoji-picker": "^1.0.0"
   },
   "devDependencies": {
-    "babel-cli": "^6.18.0",
-    "babel-plugin-add-module-exports": "^0.2.1",
-    "babel-plugin-transform-html-import-to-string": "^0.0.1",
-    "babel-plugin-transform-runtime": "^6.23.0",
-    "babel-preset-es2015": "^6.18.0",
-    "babelify": "^7.3.0",
-    "browser-sync": "^2.18.6",
-    "browserify": "^13.1.1",
-    "co": "^4.6.0",
-    "eslint": "^3.15.0",
-    "eslint-config-airbnb": "^14.1.0",
-    "eslint-plugin-import": "^2.2.0",
-    "fs-extra": "^2.1.2",
-    "http-server": "^0.9.0",
-    "licensify": "^3.1.2",
-    "mocha": "^3.3.0",
-    "nightmare": "^2.8.1",
-    "node-cmd": "^2.0.0",
-    "node-sass": "^4.3.0",
-    "nodemon": "^1.11.0",
-    "npm-run-all": "^4.0.2",
-    "onchange": "^3.2.1",
-    "power-assert": "^1.4.2",
-    "uglify-js": "^2.8.22",
-    "watchify": "^3.9.0"
+    "sass": "^1.93.2",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
   }
 }

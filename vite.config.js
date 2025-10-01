@@ -12,7 +12,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, 'src/index.js'),
       name: 'LiteEditor',
-      fileName: (format) => `lite-editor.${format}.js`,
+      fileName: (format) => `lite-editor-emoji-plugin.${format}.js`,
       formats: ['es', 'iife'],
     },
     minify: true,
